@@ -6,11 +6,25 @@ from entities.rock import Rock
 from entities.mole import Mole
 from entities.question import QuestionBag
 import datetime
+
+# THÊM IMPORT
+from .level_generator import LevelGenerator, ProceduralLevelManager
+# KHỞI TẠO LEVEL MANAGER (thêm vào sau imports)
+level_generator = LevelGenerator()
+level_manager = ProceduralLevelManager(level_generator)
+
 # Kiểm tra va chạm giữa dây và item
 def is_collision(rope, item):
-    if rope.hoo.rect.colliderect(item.rect) and rope.state == 'expanding':
-        return True
-    return False 
+    """Kiểm tra va chạm giữa rope và item"""
+    try:
+        # Đảm bảo cả rope.hoo và item đều có rect
+        if hasattr(rope, 'hoo') and hasattr(rope.hoo, 'rect') and hasattr(item, 'rect'):
+            if rope.hoo.rect.colliderect(item.rect) and rope.state == 'expanding':
+                return True
+        return False
+    except Exception as e:
+        print(f"Collision error: {e}")
+        return False
 def explosive_item(tnt, items):
     items_to_remove = []
     for item in items:
@@ -75,35 +89,158 @@ def load_items(items_data,is_clover=False,is_gem=False,is_rock=False):
         # if(item != None):
         items.append(load_item(item,is_clover,is_gem,is_rock))
     return items
-def load_level(level,is_clover,is_gem,is_rock):
-    bg_name = None
-    bg = None
-    file_path = "levels.json"
-    try :
-        with open(file_path, "r") as file:
-            data = json.load(file)
-        bg_name = data[level]['type']
-        match bg_name:
-            case "LevelA":
-                bg = bgA
-            case "LevelB":
-                bg = bgB
-            case "LevelC":
-                bg = bgC
-            case "LevelD":
-                bg = bgD
-            case "LevelE":
-                bg = bgA
-            case _:
-                bg = bgA
-    except:
-        print("No file levels.json!")
-        sys.exit(0)
-    return bg,load_items(data[level]['entities'],is_clover,is_gem,is_rock)
-def random_level(level_number):
-    ran_level = random.randint(1, 3)
-    level_text  = "L"+str(level_number)+"_"+str(ran_level)
-    return level_text
+def load_level(level, is_clover=False, is_gem=False, is_rock=False):
+    """Load level data - hỗ trợ cả original và generated levels"""
+    
+    print(f"🔄 LOAD_LEVEL: Loading '{level}'")
+    
+    # KIỂM TRA NẾU LÀ GENERATED LEVEL
+    if level.startswith('GEN_') or level.startswith('TRAIN_'):
+        print(f"🔄 LOAD_LEVEL: Detected GENERATED level")
+        try:
+            level_data = level_manager.get_level(level, "medium")  # difficulty mặc định
+            
+            if level_data:
+                print(f"🔄 LOAD_LEVEL: Successfully got level data with {len(level_data['entities'])} entities")
+                # Load background (sử dụng background mặc định)
+                try:
+                    from define import backgrounds
+                    bg = backgrounds[0] if backgrounds else None
+                except (ImportError, AttributeError):
+                    bg = None
+                    print("⚠️ Warning: backgrounds not found")
+                
+                # Tạo items từ level_data
+                items = create_entities_from_data(level_data['entities'], is_clover, is_gem, is_rock)
+                print(f"🔄 LOAD_LEVEL: Created {len(items)} items")
+                return bg, items
+            else:
+                # Fallback: sử dụng level mặc định nếu không tạo được
+                print(f"❌ LOAD_LEVEL: Generated level {level} not found, using default")
+                return load_level("L1-1", is_clover, is_gem, is_rock)
+                
+        except Exception as e:
+            print(f"❌ LOAD_LEVEL: Error loading generated level {level}: {e}")
+            import traceback
+            traceback.print_exc()
+            # Fallback to default level
+            return load_level("L1-1", is_clover, is_gem, is_rock)
+    
+    # XỬ LÝ ORIGINAL LEVELS (code cũ)
+    print(f"🔄 LOAD_LEVEL: Processing as ORIGINAL level")
+    try:
+        from define import data, backgrounds
+        
+        print(f"🔄 LOAD_LEVEL: Available levels in data: {list(data.keys())}")
+        
+        if level not in data:
+            print(f"❌ LOAD_LEVEL: Level {level} not found in data, using L1-1")
+            level = "L1-1"
+        
+        entities_data = data[level]['entities']
+        bg_index = data[level]['background']
+        bg = backgrounds[bg_index] if bg_index < len(backgrounds) else backgrounds[0]
+        
+        print(f"🔄 LOAD_LEVEL: Original level {level} has {len(entities_data)} entities")
+        
+        items = create_entities_from_data(entities_data, is_clover, is_gem, is_rock)
+        print(f"🔄 LOAD_LEVEL: Created {len(items)} items from original level")
+        return bg, items
+        
+    except Exception as e:
+        print(f"❌ LOAD_LEVEL: Error loading original level {level}: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        # Fallback cứng
+        try:
+            from define import backgrounds
+            bg = backgrounds[0] if backgrounds else None
+        except:
+            bg = None
+        
+        return bg, []  # Trả về list rỗng nếu lỗi
+def create_entities_from_data(entities_data, is_clover=False, is_gem=False, is_rock=False):
+    """Tạo entities từ dữ liệu entities_data - hỗ trợ cả 2 định dạng"""
+    items = []  # Sử dụng list thay vì pygame.sprite.Group
+    
+    print(f"DEBUG: Total entities to process: {len(entities_data)}")
+    
+    for i, entity in enumerate(entities_data):
+        try:
+            print(f"DEBUG: Processing entity {i}: {entity}")
+            
+            # XỬ LÝ ĐỊNH DẠNG ORIGINAL LEVELS (có 'type', 'pos')
+            if 'type' in entity and 'pos' in entity:
+                entity_type = entity['type']
+                x = entity['pos']['x']
+                y = entity['pos']['y']
+                
+                print(f"DEBUG: Original format - Type: {entity_type}, Pos: ({x}, {y})")
+                
+                # Sử dụng hàm load_item cũ cho original levels
+                item = load_item(entity, is_clover, is_gem, is_rock)
+                if item:
+                    items.append(item)
+                    print(f"DEBUG: Successfully created {entity_type}")
+                else:
+                    print(f"DEBUG: Failed to create {entity_type}")
+                    
+            # XỬ LÝ ĐỊNH DẠNG GENERATED LEVELS (có 'type', 'x', 'y')  
+            elif 'x' in entity and 'y' in entity and 'type' in entity:
+                entity_type = entity['type']
+                x = entity['x']
+                y = entity['y']
+                value = entity.get('value', 0)
+                
+                print(f"DEBUG: Generated format - Type: {entity_type}, Pos: ({x}, {y})")
+                
+                # Xử lý các loại entity cho generated levels
+                if entity_type == 'gold':
+                    size = entity.get('size', 1)
+                    point_value = value if value > 0 else MiniGold_point
+                    if size == 1:
+                        items.append(Gold(x, y, 30, point_value, is_rock))
+                    elif size == 2:
+                        items.append(Gold(x, y, 70, point_value, is_rock))
+                    elif size == 3:
+                        items.append(Gold(x, y, 150, point_value, is_rock))
+                elif entity_type == 'stone':
+                    size = entity.get('size', 1)
+                    point_value = value if value > 0 else MiniRock_point
+                    if size == 1:
+                        if is_rock:
+                            items.append(Rock(x, y, 30, point_value * 3))
+                        else:
+                            items.append(Rock(x, y, 30, point_value))
+                    elif size == 2:
+                        if is_rock:
+                            items.append(Rock(x, y, 60, point_value * 3))
+                        else:
+                            items.append(Rock(x, y, 60, point_value))
+                # ... (phần xử lý generated levels giữ nguyên)
+                    
+        except Exception as e:
+            print(f"ERROR creating entity {entity}: {e}")
+            import traceback
+            traceback.print_exc()
+            continue
+    
+    print(f"DEBUG: Created {len(items)} items total")
+    return items
+def random_level(level_number, use_generated=False):
+    """Chọn level ngẫu nhiên - có thể dùng generated levels"""
+    if use_generated:
+        # Sử dụng level được generate ngẫu nhiên
+        difficulties = ["easy", "medium", "hard", "expert"]
+        difficulty = difficulties[min(level_number - 1, len(difficulties) - 1)]
+        level_id = f"RANDOM_{level_number}_{random.randint(1000, 9999)}"
+        return level_id
+    else:
+        # Sử dụng level từ file JSON cũ
+        ran_level = random.randint(1, 3)
+        level_text = "L" + str(level_number) + "_" + str(ran_level)
+        return level_text
 def draw_point(rope,dt,miner):
     if rope.text == "dynamite" and rope.text_direction !="None":
         rope.time_text -= dt
@@ -160,6 +297,32 @@ def draw_point(rope,dt,miner):
         text_font = pygame.font.Font(os.path.join("assets", "fonts", 'Fernando.ttf'), int(rope.text_size))
         screen.blit(text_font.render("+$"+rope.text, True, (0, 15, 0)), (rope.x_text, rope.y_text))
 
+# tminh
+def generate_random_level(difficulty="medium", level_id=None):
+    """Tạo level ngẫu nhiên cho training hoặc custom game"""
+    if level_id is None:
+        level_id = f"CUSTOM_{random.randint(1000, 9999)}"
+    
+    level_data = level_manager.get_level(level_id, difficulty)
+    return level_id, level_data
+
+def get_training_level(episode=None):
+    """Lấy level cho RL training"""
+    if episode is None:
+        level_data = level_manager.get_level(f"TRAIN_{random.randint(1, 10000)}")
+    else:
+        # Curriculum learning: tăng difficulty theo episode
+        if episode < 1000:
+            difficulty = "easy"
+        elif episode < 5000:
+            difficulty = "medium"
+        elif episode < 10000:
+            difficulty = "hard"
+        else:
+            difficulty = "expert"
+        level_data = level_manager.get_level(f"TRAIN_{episode}", difficulty)
+    
+    return level_data
 def blit_text(surface, text, pos, font, color=pygame.Color('black')):
     words = [word.split(' ') for word in text.splitlines()]  # 2D array where each row is a list of words.
     space = font.size(' ')[0]  # The width of a space.
@@ -284,3 +447,32 @@ def load_sound(sound_name):
             pygame.mixer.stop()
             made_goal_sound.play()
 
+#utility
+def setup_training_levels(num_levels=1000):
+    """Khởi tạo pool level cho training"""
+    return level_manager.generate_infinite_levels("TRAIN", num_levels)
+
+def get_level_difficulty(level_data):
+    """Xác định difficulty của level dựa trên entity distribution"""
+    entities = level_data['entities']
+    
+    # Đếm số lượng entity types
+    gold_count = sum(1 for e in entities if "Gold" in e["type"])
+    rock_count = sum(1 for e in entities if "Rock" in e["type"])
+    enemy_count = sum(1 for e in entities if "Mole" in e["type"] or "TNT" in e["type"])
+    diamond_count = sum(1 for e in entities if "Diamond" in e["type"])
+    
+    total_entities = len(entities)
+    
+    # Phân loại difficulty
+    gold_ratio = gold_count / total_entities if total_entities > 0 else 0
+    obstacle_ratio = (rock_count + enemy_count) / total_entities if total_entities > 0 else 0
+    
+    if gold_ratio > 0.6 and obstacle_ratio < 0.2:
+        return "easy"
+    elif gold_ratio > 0.4 and obstacle_ratio < 0.4:
+        return "medium"
+    elif gold_ratio > 0.2 and obstacle_ratio < 0.6:
+        return "hard"
+    else:
+        return "expert"

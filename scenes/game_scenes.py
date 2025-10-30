@@ -7,7 +7,10 @@ from entities.shopkeeper import Shopkeeper
 from scenes.scene import Scene
 from scenes.util import *
 clock = pygame.time.Clock()
-    
+# THÊM IMPORT
+from scenes.util import level_manager, generate_random_level, get_training_level
+# THÊM BIẾN TOÀN CỤC ĐỂ CONFIG
+USE_GENERATED_LEVELS = True   
 class SceneMananger(object):
     def __init__(self):
         self.go_to(StartScene())
@@ -18,25 +21,42 @@ class StartScene(object):
     def __init__(self):
         super(StartScene, self).__init__()
         self.font = pygame.font.Font(os.path.join("assets", "fonts", 'Fernando.ttf'), 48)
-        self.button = Button(120,20,gold_image,2)
-        self.higt_score_btn = Button(80,500,hight_score,1)
-    def render(self, screen):
-        screen.blit(start_BG,(0,0))
-        self.button.render(screen)
-        self.higt_score_btn.render(screen)
-        screen.blit(miner_menu,miner_menu_rect)
-        text = self.font.render('Chơi', True, (255, 255, 255))
-        screen.blit(text, (250, 160))
-    def update(self,screen):
-        pass
+        self.button = Button(120, 20, gold_image, 2)
+        self.higt_score_btn = Button(80, 500, hight_score, 1)
+        self.toggle_level_btn = Button(400, 500, hight_score, 1)
+    
     def start(self):
+        # 🎯 RESET STATE KHI BẮT ĐẦU GAME MỚI
+        from define import reset_game_state
+        reset_game_state()
+        
         set_time(pygame.time.get_ticks()/1000)
         self.manager.go_to(GameScene(level=get_level()))
+    
+    def render(self, screen):
+        screen.blit(start_BG, (0,0))
+        self.button.render(screen)
+        self.higt_score_btn.render(screen)
+        self.toggle_level_btn.render(screen)  # THÊM
+        screen.blit(miner_menu, miner_menu_rect)
+        text = self.font.render('Chơi', True, (255, 255, 255))
+        screen.blit(text, (250, 160))
+        
+        # THÊM: Hiển thị trạng thái current level system
+        level_type = "Generated Levels" if USE_GENERATED_LEVELS else "Original Levels"
+        type_font = pygame.font.Font(None, 24)
+        screen.blit(type_font.render(f"Level System: {level_type}", True, (255, 255, 255)), (400, 550))
+    def update(self, screen):
+        pass
     def handle_events(self, events):
         if self.button.is_click():
             self.start()
         if self.higt_score_btn.is_click():
             self.manager.go_to(HighScoreScene())
+        # THÊM: Toggle level system
+        if self.toggle_level_btn.is_click():
+            global USE_GENERATED_LEVELS
+            USE_GENERATED_LEVELS = not USE_GENERATED_LEVELS
 class FinishScene(object):
     def __init__(self):
         super(FinishScene, self).__init__()
@@ -61,6 +81,14 @@ class FailureScene(object):
         write_high_score(get_score())
         load_sound("made_goal_sound")
         self.font = pygame.font.Font(os.path.join("assets", "fonts", 'Fernando.ttf'), 24)
+    
+    def handle_events(self, events):
+        for e in events:
+            if e.type == pygame.KEYDOWN and e.key == pygame.K_SPACE:
+                # 🎯 RESET STATE KHI CHƠI LẠI SAU FAILURE
+                from define import reset_game_state
+                reset_game_state()
+                self.manager.go_to(StartScene())
     def render(self, screen):
         screen.blit(cut_scene,(0,0))
         screen.blit(panel_image,panel_image.get_rect(center = (screen_width/2,screen_height/2)))
@@ -79,6 +107,14 @@ class WinScene(object):
         write_high_score(get_score())
         load_sound("goal_sound")
         self.font = pygame.font.Font(os.path.join("assets", "fonts", 'Fernando.ttf'), 24)
+    
+    def handle_events(self, events):
+        for e in events:
+            if e.type == pygame.KEYDOWN and e.key == pygame.K_SPACE:
+                # 🎯 RESET STATE KHI CHƠI LẠI SAU WIN
+                from define import reset_game_state
+                reset_game_state()
+                self.manager.go_to(StartScene())
     def render(self, screen):
         screen.blit(cut_scene,(0,0))
         screen.blit(panel_image,panel_image.get_rect(center = (screen_width/2,screen_height/2)))
@@ -235,16 +271,41 @@ class StoreScene(object):
         for e in events:
             if e.type == pygame.KEYDOWN and e.key == pygame.K_SPACE:
                 self.start(self.buyTNT,self.buyDrink,self.buyClover,self.buyGem,self.buyRock)
-    def start(self,tnt=0,speed=1,clover =0,gem =0, rock =0):
-            set_time(pygame.time.get_ticks()/1000)
-            self.manager.go_to(GameScene(get_level(),tnt,speed,clover,gem,rock))
+    def start(self, tnt=0, speed=1, clover=0, gem=0, rock=0):
+        set_time(pygame.time.get_ticks()/1000)
+        self.manager.go_to(GameScene(get_level(), tnt, speed, clover, gem, rock, use_generated=USE_GENERATED_LEVELS))
 class GameScene(Scene):
-    def __init__(self, level,tnt=0,speed=1,is_clover =False,is_gem =False, is_rock =False):
+    def __init__(self, level, tnt=0, speed=1, is_clover=False, is_gem=False, is_rock=False, use_generated=None):
         super(GameScene, self).__init__()
         self.level = level
+        
+        # THÊM: Xác định có dùng generated levels không
+        if use_generated is None:
+            self.use_generated = USE_GENERATED_LEVELS
+        else:
+            self.use_generated = use_generated
+            
+        print(f"🎮 GAMESCENE INIT: Level={level}, Use Generated={self.use_generated}")
+        
         self.miner = Miner(620, -7, 5)
-        self.rope = Rope(643, 45, 300,hoo_images,tnt,speed)
-        self.bg,self.items = load_level(random_level(self.level),is_clover,is_gem,is_rock)
+        self.rope = Rope(643, 45, 300, hoo_images, tnt, speed)
+        
+        # THAY ĐỔI QUAN TRỌNG: Load level với hệ thống mới
+        if self.use_generated:
+            # Sử dụng generated levels
+            level_id = self._get_generated_level_id()
+            print(f"🎮 GAMESCENE: Loading generated level: {level_id}")
+            self.bg, self.items = load_level(level_id, is_clover, is_gem, is_rock)
+            self.current_level_id = level_id
+        else:
+            # Sử dụng level cũ từ JSON
+            level_id = random_level(self.level)
+            print(f"🎮 GAMESCENE: Loading original level: {level_id}")
+            self.bg, self.items = load_level(level_id, is_clover, is_gem, is_rock)
+            self.current_level_id = level_id
+        
+        print(f"🎮 GAMESCENE: Loaded {len(self.items)} items")
+        
         # self.bg,self.items = load_level("LDEBUG")
         self.play_Explosive = False
         self.explosive = None
@@ -252,53 +313,103 @@ class GameScene(Scene):
         self.timer = 0
         self.pause_time = 0
         self.pause = False
-        self.exit_button = Button(1050,5,exit_image,0.25)
-        self.next_button = Button(950,0,next_image,0.4)
+        self.exit_button = Button(1050, 5, exit_image, 0.25)
+        self.next_button = Button(950, 0, next_image, 0.4)
+    def _get_generated_level_id(self):
+        """Tạo hoặc lấy level_id cho generated levels"""
+        try:
+            # Dựa trên level number để xác định difficulty
+            difficulties = ["easy", "medium", "hard", "expert"]
+            difficulty_index = min(self.level - 1, len(difficulties) - 1)
+            difficulty = difficulties[difficulty_index]
+            
+            print(f"🎯 DEBUG: Creating generated level for level {self.level} with difficulty {difficulty}")
+            
+            # 🎯 Tạo level_id unique
+            level_id = f"GEN_L{self.level}_{random.randint(1000, 9999)}"
+            
+            print(f"🎯 DEBUG: Level ID: {level_id}")
+            
+            # 🎯 Đảm bảo level được tạo trong manager
+            level_data = level_manager.get_level(level_id, difficulty)
+            
+            if level_data and level_data.get('entities'):
+                print(f"✅ DEBUG: Successfully generated level {level_id} with {len(level_data['entities'])} entities")
+                return level_id
+            else:
+                print(f"❌ DEBUG: Failed to generate level {level_id}")
+                raise Exception("Level generation failed")
+            
+        except Exception as e:
+            print(f"❌ Error in _get_generated_level_id: {e}")
+            import traceback
+            traceback.print_exc()
+            # Fallback về level gốc
+            ran_level = random.randint(1, 3)
+            fallback_level = f"L{self.level}_{ran_level}"
+            print(f"🔄 Fallback to original level: {fallback_level}")
+            return fallback_level
+    def render_debug_info(self, screen):
+        """Hiển thị thông tin debug cho generated levels (tùy chọn)"""
+        if self.use_generated:
+            debug_font = pygame.font.Font(None, 20)
+            debug_text = f"Level: {self.current_level_id} | Entities: {len(self.items)}"
+            screen.blit(debug_font.render(debug_text, True, (255, 0, 0)), (10, 50))
+            
+            # Hiển thị số lượng từng loại entity
+            entity_count = {}
+            for item in self.items:
+                item_type = type(item).__name__
+                entity_count[item_type] = entity_count.get(item_type, 0) + 1
+            
+            y_offset = 70
+            for entity_type, count in entity_count.items():
+                screen.blit(debug_font.render(f"{entity_type}: {count}", True, (255, 0, 0)), (10, y_offset))
+                y_offset += 20
     def render(self, screen):            
         dt = clock.tick(60) / 1000
-        if(self.miner.state == 1):
-            for item in self.items:
-                if is_collision(self.rope, item):
-                    self.rope.item = item
-                    self.rope.item.is_move = False
-                    if item.is_explosive == True:
-                        # pygame.mixer.stop()
-                        load_sound("explosive_sound")
-                        explosive_item(item,self.items)
-                    self.rope.state = 'retracting'
-                    self.items.remove(item)
-                    break
+        
         if self.rope.state == 'retracting' and not(self.rope.is_use_TNT):
             self.miner.state = 2
+            
         screen.blit(bg_top,(0,0))
         screen.blit(self.bg,(0,72))
         self.exit_button.render(screen)
         self.next_button.render(screen)
-        #Draw item
+        
+        #Draw item - SỬA: items bây giờ là list
         for item in self.items:
-            item.draw(dt,screen)
-    
-        if(self.play_Explosive == True and self.explosive != None):
-            # pygame.mixer.stop()
-            # explosive_sound.play()
+            item.draw(dt, screen)
+
+        # DEBUG: Hiển thị thông tin items
+        debug_font = pygame.font.Font(None, 24)
+        screen.blit(debug_font.render(f"Items: {len(self.items)}", True, (255, 0, 0)), (10, 100))
+        screen.blit(debug_font.render(f"Level: {self.current_level_id}", True, (255, 0, 0)), (10, 120))
+        screen.blit(debug_font.render(f"Use Generated: {self.use_generated}", True, (255, 0, 0)), (10, 140))
+
+        # SỬA: Kiểm tra explosive tồn tại trước khi truy cập thuộc tính
+        if self.play_Explosive and self.explosive is not None:
             load_sound("explosive_sound")
             self.explosive.draw(screen)
             self.explosive.update(dt)
-            if (self.explosive.is_exit):
-                del self.explosive
+            if hasattr(self.explosive, 'is_exit') and self.explosive.is_exit:
+                self.explosive = None
                 self.play_Explosive = False
                 self.miner.is_TNT = False
                 self.miner.state = 0
                 self.rope.is_use_TNT = False
+                
         for i in range(self.rope.have_TNT):
-            screen.blit(dynamite_image,(725+i*25,10))
+            screen.blit(dynamite_image, (725+i*25, 10))
+        
         #Update sprite
         self.miner.update(dt)
         self.miner.draw(screen)
-        self.rope.update(self.miner,dt,screen)
+        self.rope.update(self.miner, dt, screen)
         self.rope.draw(screen)
-        draw_point(self.rope,dt,self.miner)
-    def update(self,screen):
+        draw_point(self.rope, dt, self.miner)
+
+    def update(self, screen):
         self.timer = 60 - int(pygame.time.get_ticks()/1000 - get_time())
         screen.blit(self.text_font.render("Tiền:", True, (0, 0, 0)), (5, 0))
         screen.blit(self.text_font.render("$"+str(get_score()), True, (0, 150, 0)), (55, 0))
@@ -308,21 +419,52 @@ class GameScene(Scene):
         screen.blit(self.text_font.render(str(self.timer), True, (255, 100, 7)), (1240, 0))
         screen.blit(self.text_font.render("Cấp:", True, (0, 0, 0)), (1140, 25))
         screen.blit(self.text_font.render(str(self.level), True, (255, 100, 7)), (1190, 25))
+        
+        # THÊM: Xử lý collision trong update
+        if self.miner.state == 1:
+            items_to_remove = []
+            for item in self.items:
+                if is_collision(self.rope, item):
+                    self.rope.item = item
+                    if hasattr(item, 'is_move'):
+                        item.is_move = False
+                    if hasattr(item, 'is_explosive') and item.is_explosive == True:
+                        load_sound("explosive_sound")
+                        explosive_item(item, self.items)
+                    self.rope.state = 'retracting'
+                    items_to_remove.append(item)
+                    break  # Chỉ bắt 1 item tại một thời điểm
+            
+            # Xóa items sau khi đã lặp xong
+            for item in items_to_remove:
+                self.items.remove(item)
+            self.timer = 60 - int(pygame.time.get_ticks()/1000 - get_time())
+            screen.blit(self.text_font.render("Tiền:", True, (0, 0, 0)), (5, 0))
+            screen.blit(self.text_font.render("$"+str(get_score()), True, (0, 150, 0)), (55, 0))
+            screen.blit(self.text_font.render("Mục tiêu:", True, (0, 0, 0)), (5, 25))
+            screen.blit(self.text_font.render("$"+str(get_goal()), True, (255, 150, 0)), (96, 25))
+            screen.blit(self.text_font.render("Thời gian:", True, (0, 0, 0)), (1140, 0))
+            screen.blit(self.text_font.render(str(self.timer), True, (255, 100, 7)), (1240, 0))
+            screen.blit(self.text_font.render("Cấp:", True, (0, 0, 0)), (1140, 25))
+            screen.blit(self.text_font.render(str(self.level), True, (255, 100, 7)), (1190, 25))
     def next_level(self):
         if get_score() > get_goal():
-            set_level(get_level()+1)
-            if get_level() >10:
-                self.manager.go_to(WinScene())
-                return
-            set_goal(get_goal()+get_level()*goalAddOn)
+            set_level(get_level() + 1)
+            
+            # if get_level() > 10:
+            #     self.manager.go_to(WinScene())
+            #     return
+                
+            set_goal(get_goal() + get_level() * goalAddOn)
             self.manager.go_to(FinishScene())
         else:
             set_level(1)
             set_goal(650)
             self.manager.go_to(FailureScene())
     def handle_events(self, events):
-        if(self.timer <0):
+        if self.timer < 0:
             self.next_level()
+            
         for e in events:
             if self.exit_button.is_click():
                 self.manager.go_to(StartScene())
@@ -334,23 +476,102 @@ class GameScene(Scene):
                 sys.exit(0)
             if e.type == pygame.KEYDOWN:
                 if e.key == pygame.K_SPACE: #PAUSE and UNPAUSE
-                    self.pause = not(self.pause)
+                    self.pause = not self.pause
                     if self.pause: #PAUSE
                         self.pause_time = pygame.time.get_ticks()/1000
                         set_pause(True)
                     else: #UNPAUSE
                         set_pause(False)
                         set_time(get_time() + pygame.time.get_ticks()/1000 - self.pause_time)
-                if e.key == pygame.K_ESCAPE: #ESC -->tesst
+                if e.key == pygame.K_ESCAPE: #ESC --> test
                     self.next_level()
-                if (e.key == pygame.K_DOWN and self.rope.timer <=0 ): # expanding
+                if e.key == pygame.K_DOWN and self.rope.timer <= 0: # expanding
                     self.miner.state = 1
                 if e.key == pygame.K_UP: # retracting
-                    if(self.rope.have_TNT > 0 and self.rope.item != None):
+                    if hasattr(self.rope, 'have_TNT') and self.rope.have_TNT > 0 and self.rope.item is not None:
                         self.rope.is_use_TNT = True
                         self.miner.state = 4
+                        # SỬA: Khởi tạo explosive đúng cách
                         self.explosive = Explosive(self.rope.x2-128, self.rope.y2-128, 12)
                         self.play_Explosive = True
-                        self.rope.have_TNT -=1
+                        self.rope.have_TNT -= 1
                         self.rope.length = 50
                         self.miner.is_TNT = True
+    def update(self, screen):
+        self.timer = 60 - int(pygame.time.get_ticks()/1000 - get_time())
+        screen.blit(self.text_font.render("Tiền:", True, (0, 0, 0)), (5, 0))
+        screen.blit(self.text_font.render("$"+str(get_score()), True, (0, 150, 0)), (55, 0))
+        screen.blit(self.text_font.render("Mục tiêu:", True, (0, 0, 0)), (5, 25))
+        screen.blit(self.text_font.render("$"+str(get_goal()), True, (255, 150, 0)), (96, 25))
+        screen.blit(self.text_font.render("Thời gian:", True, (0, 0, 0)), (1140, 0))
+        screen.blit(self.text_font.render(str(self.timer), True, (255, 100, 7)), (1240, 0))
+        screen.blit(self.text_font.render("Cấp:", True, (0, 0, 0)), (1140, 25))
+        screen.blit(self.text_font.render(str(self.level), True, (255, 100, 7)), (1190, 25))
+    
+        # THÊM: Xử lý collision trong update thay vì render
+        if self.miner.state == 1:
+            items_to_remove = []
+            for item in self.items:
+                if is_collision(self.rope, item):
+                    self.rope.item = item
+                    self.rope.item.is_move = False
+                    if hasattr(item, 'is_explosive') and item.is_explosive == True:
+                        load_sound("explosive_sound")
+                        explosive_item(item, self.items)
+                    self.rope.state = 'retracting'
+                    items_to_remove.append(item)
+                    break  # Chỉ bắt 1 item tại một thời điểm
+        
+            # Xóa items sau khi đã lặp xong
+            for item in items_to_remove:
+                self.items.remove(item)
+class RLTrainingScene(Scene):
+    """Scene đặc biệt cho RL training với generated levels"""
+    def __init__(self, episode=None, difficulty=None):
+        super(RLTrainingScene, self).__init__()
+        
+        # Lấy level cho training
+        if difficulty:
+            level_data = level_manager.get_level(f"TRAIN_{episode or random.randint(1, 10000)}", difficulty)
+        else:
+            level_data = get_training_level(episode)
+            
+        self.level_data = level_data
+        self.miner = Miner(620, -7, 5)
+        self.rope = Rope(643, 45, 300, hoo_images, 0, 1)
+        
+        # Load items từ level_data
+        self.bg, self.items = load_level(f"TRAIN_{episode or 0}", False, False, False)
+        
+        self.text_font = pygame.font.Font(os.path.join("assets", "fonts", 'Fernando.ttf'), 14)
+        self.timer = 0
+        self.episode = episode
+        
+    def render(self, screen):
+        # Tương tự như GameScene nhưng không có UI điều khiển
+        dt = clock.tick(60) / 1000
+        # ... rendering logic giống GameScene ...
+        
+    def get_state(self):
+        """Trả về state cho RL agent"""
+        # Ví dụ: trả về thông tin về các items, vị trí, etc.
+        state = {
+            'miner_pos': (self.miner.x, self.miner.y),
+            'rope_angle': self.rope.angle,
+            'rope_length': self.rope.length,
+            'items': [(type(item).__name__, item.x, item.y) for item in self.items],
+            'score': get_score(),
+            'time_left': self.timer
+        }
+        return state
+        
+    def apply_action(self, action):
+        """Áp dụng action từ RL agent"""
+        # action có thể là: 0=không làm gì, 1=thả dây, 2=kéo dây, 3=ném TNT, etc.
+        if action == 1 and self.rope.state == 'idle':
+            self.rope.state = 'expanding'
+        elif action == 2 and self.rope.state == 'expanding':
+            self.rope.state = 'retracting'
+        # ... các action khác ...   
+    def update(seft,screen):
+        pass

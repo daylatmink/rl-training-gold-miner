@@ -114,6 +114,10 @@ miner_menu = pygame.image.load('./assets/images/miner_menu.png')
 miner_menu_rect  = miner_menu.get_rect(bottomright=(screen_width,screen_height))
 start_BG = pygame.image.load('./assets/images/start_BG.jpg')
 store_BG = pygame.image.load('./assets/images/bg_shop.png')
+backgrounds = [bgA, bgB, bgC, bgD]
+
+
+
 
 # ---------------------------------------init sound
 pygame.mixer.pre_init(frequency=11025, size=-16, channels=8, buffer=2048)
@@ -144,6 +148,26 @@ Bone_point = 7
 score = 0
 goal = 650
 goalAddOn = 275
+
+def reset_game_state():
+    """Reset tất cả state về giá trị ban đầu"""
+    global score, goal, current_level, pause, start_time
+    score = 0
+    goal = 650
+    current_level = 1
+    pause = False
+    start_time = None
+    print("🔄 Game state reset to initial values")
+def load_level_data():
+    try:
+        with open('./assets/levels/levels.json', 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        print("Levels.json not found, using empty data")
+        return {}
+    except Exception as e:
+        print(f"Error loading levels.json: {e}")
+        return {}
 def get_score():
     return score
 def set_score(new_score):
