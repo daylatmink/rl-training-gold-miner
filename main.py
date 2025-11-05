@@ -1,7 +1,7 @@
 import pygame
 import sys
 from scenes.game_scenes import SceneMananger
-from define import reset_game_state  # 🎯 THÊM IMPORT
+from define import reset_game_state 
 
 def main():
     pygame.init()

@@ -9,6 +9,8 @@ from scenes.util import *
 clock = pygame.time.Clock()
 # THÊM IMPORT
 from scenes.util import level_manager, generate_random_level, get_training_level
+# THÊM IMPORT STATE EXPORTER
+from state_exporter import get_game_state, save_state_to_json
 # THÊM BIẾN TOÀN CỤC ĐỂ CONFIG
 USE_GENERATED_LEVELS = True   
 class SceneMananger(object):
@@ -272,7 +274,9 @@ class StoreScene(object):
             if e.type == pygame.KEYDOWN and e.key == pygame.K_SPACE:
                 self.start(self.buyTNT,self.buyDrink,self.buyClover,self.buyGem,self.buyRock)
     def start(self, tnt=0, speed=1, clover=0, gem=0, rock=0):
+        from define import reset_scaled_time
         set_time(pygame.time.get_ticks()/1000)
+        reset_scaled_time()  # Reset scaled time khi bắt đầu level mới
         self.manager.go_to(GameScene(get_level(), tnt, speed, clover, gem, rock, use_generated=USE_GENERATED_LEVELS))
 class GameScene(Scene):
     def __init__(self, level, tnt=0, speed=1, is_clover=False, is_gem=False, is_rock=False, use_generated=None):
@@ -285,26 +289,26 @@ class GameScene(Scene):
         else:
             self.use_generated = use_generated
             
-        print(f"🎮 GAMESCENE INIT: Level={level}, Use Generated={self.use_generated}")
-        
         self.miner = Miner(620, -7, 5)
-        self.rope = Rope(643, 45, 300, hoo_images, tnt, speed)
+        
+        # Lấy số dynamite từ global state và cộng thêm TNT mới mua (nếu có)
+        from define import get_dynamite_count, set_dynamite_count
+        old_tnt = get_dynamite_count()
+        new_tnt = set_dynamite_count(old_tnt + tnt)  # set_dynamite_count đã giới hạn tối đa 5
+        
+        self.rope = Rope(643, 45, 300, hoo_images, new_tnt, speed)
         
         # THAY ĐỔI QUAN TRỌNG: Load level với hệ thống mới
         if self.use_generated:
             # Sử dụng generated levels
             level_id = self._get_generated_level_id()
-            print(f"🎮 GAMESCENE: Loading generated level: {level_id}")
             self.bg, self.items = load_level(level_id, is_clover, is_gem, is_rock)
             self.current_level_id = level_id
         else:
             # Sử dụng level cũ từ JSON
             level_id = random_level(self.level)
-            print(f"🎮 GAMESCENE: Loading original level: {level_id}")
             self.bg, self.items = load_level(level_id, is_clover, is_gem, is_rock)
             self.current_level_id = level_id
-        
-        print(f"🎮 GAMESCENE: Loaded {len(self.items)} items")
         
         # self.bg,self.items = load_level("LDEBUG")
         self.play_Explosive = False
@@ -323,21 +327,15 @@ class GameScene(Scene):
             difficulty_index = min(self.level - 1, len(difficulties) - 1)
             difficulty = difficulties[difficulty_index]
             
-            print(f"🎯 DEBUG: Creating generated level for level {self.level} with difficulty {difficulty}")
-            
-            # 🎯 Tạo level_id unique
+            # Tạo level_id unique
             level_id = f"GEN_L{self.level}_{random.randint(1000, 9999)}"
             
-            print(f"🎯 DEBUG: Level ID: {level_id}")
-            
-            # 🎯 Đảm bảo level được tạo trong manager
+            # Đảm bảo level được tạo trong manager
             level_data = level_manager.get_level(level_id, difficulty)
             
             if level_data and level_data.get('entities'):
-                print(f"✅ DEBUG: Successfully generated level {level_id} with {len(level_data['entities'])} entities")
                 return level_id
             else:
-                print(f"❌ DEBUG: Failed to generate level {level_id}")
                 raise Exception("Level generation failed")
             
         except Exception as e:
@@ -347,7 +345,6 @@ class GameScene(Scene):
             # Fallback về level gốc
             ran_level = random.randint(1, 3)
             fallback_level = f"L{self.level}_{ran_level}"
-            print(f"🔄 Fallback to original level: {fallback_level}")
             return fallback_level
     def render_debug_info(self, screen):
         """Hiển thị thông tin debug cho generated levels (tùy chọn)"""
@@ -366,8 +363,26 @@ class GameScene(Scene):
             for entity_type, count in entity_count.items():
                 screen.blit(debug_font.render(f"{entity_type}: {count}", True, (255, 0, 0)), (10, y_offset))
                 y_offset += 20
-    def render(self, screen):            
-        dt = clock.tick(60) / 1000
+    def render(self, screen):
+        from define import get_game_speed, add_scaled_time, get_use_fixed_timestep
+        game_speed = get_game_speed()
+        
+        # Check nếu đang dùng fixed timestep (RL training) hay real time (game bình thường)
+        if get_use_fixed_timestep():
+            # Fixed dt cho RL training - KHÔNG ÁP DỤNG game_speed
+            # Vì physics phải deterministic, game_speed chỉ để tăng số frames/giây thực tế
+            base_dt = 1.0 / 60.0  # Fixed 60 FPS (16.67ms per frame)
+            dt = base_dt  # Không nhân với game_speed!
+        else:
+            # Real time cho game bình thường - ÁP DỤNG game_speed
+            base_dt = clock.tick(60) / 1000.0  # Delta time dựa trên real time
+            dt = base_dt * game_speed  # Game speed chỉ ảnh hưởng ở chế độ real-time
+            
+        add_scaled_time(dt)  # Cập nhật scaled time
+        
+        # Nếu pause, dt = 0 để dừng mọi animation/movement
+        if self.pause:
+            dt = 0
         
         if self.rope.state == 'retracting' and not(self.rope.is_use_TNT):
             self.miner.state = 2
@@ -381,11 +396,12 @@ class GameScene(Scene):
         for item in self.items:
             item.draw(dt, screen)
 
-        # DEBUG: Hiển thị thông tin items
+        # DEBUG: Hiển thị thông tin items và game speed
         debug_font = pygame.font.Font(None, 24)
         screen.blit(debug_font.render(f"Items: {len(self.items)}", True, (255, 0, 0)), (10, 100))
         screen.blit(debug_font.render(f"Level: {self.current_level_id}", True, (255, 0, 0)), (10, 120))
         screen.blit(debug_font.render(f"Use Generated: {self.use_generated}", True, (255, 0, 0)), (10, 140))
+        screen.blit(debug_font.render(f"Speed: x{game_speed}", True, (0, 255, 0)), (10, 160))  # Hiển thị game speed
 
         # SỬA: Kiểm tra explosive tồn tại trước khi truy cập thuộc tính
         if self.play_Explosive and self.explosive is not None:
@@ -410,7 +426,9 @@ class GameScene(Scene):
         draw_point(self.rope, dt, self.miner)
 
     def update(self, screen):
-        self.timer = 60 - int(pygame.time.get_ticks()/1000 - get_time())
+        from define import get_scaled_time_offset
+        # Tính thời gian còn lại dựa trên scaled time thay vì real time
+        self.timer = 60 - int(get_scaled_time_offset())
         screen.blit(self.text_font.render("Tiền:", True, (0, 0, 0)), (5, 0))
         screen.blit(self.text_font.render("$"+str(get_score()), True, (0, 150, 0)), (55, 0))
         screen.blit(self.text_font.render("Mục tiêu:", True, (0, 0, 0)), (5, 25))
@@ -475,13 +493,21 @@ class GameScene(Scene):
                 pygame.quit()
                 sys.exit(0)
             if e.type == pygame.KEYDOWN:
-                if e.key == pygame.K_SPACE: #PAUSE and UNPAUSE
-                    self.pause = not self.pause
-                    if self.pause: #PAUSE
+                if e.key == pygame.K_SPACE: #EXPORT STATE và PAUSE/UNPAUSE
+                    # Lấy state và ghi vào file JSON (TRƯỚC KHI pause/unpause)
+                    state = get_game_state(self)
+                    save_state_to_json(state)
+                    print(f"✅ State đã được lưu vào state.json")
+                    
+                    # Sau đó mới pause/unpause
+                    if not self.pause:  # Nếu đang chơi → pause
+                        self.pause = True
                         self.pause_time = pygame.time.get_ticks()/1000
                         set_pause(True)
-                    else: #UNPAUSE
+                    else:  # Nếu đang pause → unpause
+                        self.pause = False
                         set_pause(False)
+                        # Cộng thêm thời gian đã pause vào start_time
                         set_time(get_time() + pygame.time.get_ticks()/1000 - self.pause_time)
                 if e.key == pygame.K_ESCAPE: #ESC --> test
                     self.next_level()
@@ -495,10 +521,20 @@ class GameScene(Scene):
                         self.explosive = Explosive(self.rope.x2-128, self.rope.y2-128, 12)
                         self.play_Explosive = True
                         self.rope.have_TNT -= 1
+                        
+                        # Cập nhật số dynamite trong global state
+                        from define import set_dynamite_count
+                        set_dynamite_count(self.rope.have_TNT)
+                        
                         self.rope.length = 50
                         self.miner.is_TNT = True
+                if e.key == pygame.K_RETURN:  # Enter key cycles game speed
+                    from define import cycle_game_speed
+                    cycle_game_speed()
     def update(self, screen):
-        self.timer = 60 - int(pygame.time.get_ticks()/1000 - get_time())
+        from define import get_scaled_time_offset
+        # Tính thời gian còn lại dựa trên scaled time thay vì real time
+        self.timer = 60 - int(get_scaled_time_offset())
         screen.blit(self.text_font.render("Tiền:", True, (0, 0, 0)), (5, 0))
         screen.blit(self.text_font.render("$"+str(get_score()), True, (0, 150, 0)), (55, 0))
         screen.blit(self.text_font.render("Mục tiêu:", True, (0, 0, 0)), (5, 25))

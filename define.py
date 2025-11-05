@@ -148,26 +148,42 @@ Bone_point = 7
 score = 0
 goal = 650
 goalAddOn = 275
+dynamite_count = 0  # Thêm biến để lưu số lượng dynamite
+game_speed = 1  # Tốc độ game: 1x, 2x, 5x, 10x
+use_fixed_timestep = False  # True = fixed dt cho RL, False = real time cho game bình thường
 
 def reset_game_state():
     """Reset tất cả state về giá trị ban đầu"""
-    global score, goal, current_level, pause, start_time
+    global score, goal, current_level, pause, start_time, dynamite_count, game_speed, scaled_time_offset, use_fixed_timestep
     score = 0
     goal = 650
     current_level = 1
     pause = False
     start_time = None
-    print("🔄 Game state reset to initial values")
+    dynamite_count = 0  # Reset số dynamite về 0
+    game_speed = 1  # Reset tốc độ về 1x
+    scaled_time_offset = 0  # Reset thời gian đã scale
+    use_fixed_timestep = False  # Reset về real time cho game bình thường
+
 def load_level_data():
     try:
-        with open('./assets/levels/levels.json', 'r', encoding='utf-8') as f:
-            return json.load(f)
+        # Thử load từ assets/levels/ trước
+        try:
+            with open('./assets/levels/levels.json', 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except FileNotFoundError:
+            # Fallback về thư mục gốc
+            with open('./levels.json', 'r', encoding='utf-8') as f:
+                return json.load(f)
     except FileNotFoundError:
-        print("Levels.json not found, using empty data")
+        print("⚠️ Levels.json not found, using empty data")
         return {}
     except Exception as e:
-        print(f"Error loading levels.json: {e}")
+        print(f"❌ Error loading levels.json: {e}")
         return {}
+
+# Load level data khi khởi động
+data = load_level_data()
 def get_score():
     return score
 def set_score(new_score):
@@ -188,12 +204,28 @@ def set_pause(new_pause):
     pause = new_pause
 
 start_time = None
+scaled_time_offset = 0  # Offset thời gian đã scale theo game speed
+
 def get_time():
     return start_time
 
-def set_time(new_pause):
+def set_time(new_time):
     global start_time
-    start_time = new_pause
+    start_time = new_time
+
+def get_scaled_time_offset():
+    """Lấy offset thời gian đã được scale theo game speed"""
+    return scaled_time_offset
+
+def add_scaled_time(dt):
+    """Thêm delta time đã scale vào offset (được gọi mỗi frame)"""
+    global scaled_time_offset
+    scaled_time_offset += dt
+
+def reset_scaled_time():
+    """Reset scaled time khi bắt đầu level mới"""
+    global scaled_time_offset
+    scaled_time_offset = 0
 
 current_level = 1
 def get_level():
@@ -201,6 +233,69 @@ def get_level():
 def set_level(new_level):
     global current_level
     current_level = new_level
+
+# Dynamite count management
+MAX_DYNAMITE = 5  # Giới hạn tối đa dynamite
+
+def get_dynamite_count():
+    return dynamite_count
+
+def set_dynamite_count(count):
+    global dynamite_count
+    # Giới hạn tối đa 5 dynamite
+    if count > MAX_DYNAMITE:
+        dynamite_count = MAX_DYNAMITE
+    else:
+        dynamite_count = max(0, count)  # Không cho phép âm
+    return dynamite_count
+
+def add_dynamite(amount=1):
+    global dynamite_count
+    old_count = dynamite_count
+    dynamite_count = min(dynamite_count + amount, MAX_DYNAMITE)  # Giới hạn tối đa
+    
+    if dynamite_count >= MAX_DYNAMITE:
+        print(f"⚠️ Dynamite đã đạt giới hạn tối đa ({MAX_DYNAMITE})!")
+    
+    return dynamite_count
+
+def use_dynamite():
+    global dynamite_count
+    if dynamite_count > 0:
+        dynamite_count -= 1
+        return True
+    return False
+
+# Game speed management
+SPEED_LEVELS = [1, 2, 5, 10]  # Các mức tốc độ: x1, x2, x5, x10
+
+def get_game_speed():
+    return game_speed
+
+def cycle_game_speed():
+    """Chuyển đổi tốc độ game theo chu kỳ: 1x -> 2x -> 5x -> 10x -> 1x"""
+    global game_speed
+    current_index = SPEED_LEVELS.index(game_speed) if game_speed in SPEED_LEVELS else 0
+    next_index = (current_index + 1) % len(SPEED_LEVELS)
+    game_speed = SPEED_LEVELS[next_index]
+    print(f"⚡ Game speed: x{game_speed}")
+    return game_speed
+
+def set_game_speed(speed):
+    global game_speed
+    if speed in SPEED_LEVELS:
+        game_speed = speed
+    return game_speed
+
+def get_use_fixed_timestep():
+    """Lấy flag fixed timestep (True = RL training, False = game bình thường)"""
+    return use_fixed_timestep
+
+def set_use_fixed_timestep(value):
+    """Set flag fixed timestep cho RL training"""
+    global use_fixed_timestep
+    use_fixed_timestep = value
+    return use_fixed_timestep
 
 # Đường dẫn đến file txt
 high_score_file = "high_scores.txt"

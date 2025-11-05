@@ -92,16 +92,12 @@ def load_items(items_data,is_clover=False,is_gem=False,is_rock=False):
 def load_level(level, is_clover=False, is_gem=False, is_rock=False):
     """Load level data - hỗ trợ cả original và generated levels"""
     
-    print(f"🔄 LOAD_LEVEL: Loading '{level}'")
-    
     # KIỂM TRA NẾU LÀ GENERATED LEVEL
     if level.startswith('GEN_') or level.startswith('TRAIN_'):
-        print(f"🔄 LOAD_LEVEL: Detected GENERATED level")
         try:
             level_data = level_manager.get_level(level, "medium")  # difficulty mặc định
             
             if level_data:
-                print(f"🔄 LOAD_LEVEL: Successfully got level data with {len(level_data['entities'])} entities")
                 # Load background (sử dụng background mặc định)
                 try:
                     from define import backgrounds
@@ -112,7 +108,6 @@ def load_level(level, is_clover=False, is_gem=False, is_rock=False):
                 
                 # Tạo items từ level_data
                 items = create_entities_from_data(level_data['entities'], is_clover, is_gem, is_rock)
-                print(f"🔄 LOAD_LEVEL: Created {len(items)} items")
                 return bg, items
             else:
                 # Fallback: sử dụng level mặc định nếu không tạo được
@@ -127,24 +122,22 @@ def load_level(level, is_clover=False, is_gem=False, is_rock=False):
             return load_level("L1-1", is_clover, is_gem, is_rock)
     
     # XỬ LÝ ORIGINAL LEVELS (code cũ)
-    print(f"🔄 LOAD_LEVEL: Processing as ORIGINAL level")
     try:
         from define import data, backgrounds
         
-        print(f"🔄 LOAD_LEVEL: Available levels in data: {list(data.keys())}")
-        
         if level not in data:
-            print(f"❌ LOAD_LEVEL: Level {level} not found in data, using L1-1")
-            level = "L1-1"
+            print(f"❌ LOAD_LEVEL: Level {level} not found in data, using L1_1")
+            level = "L1_1"
         
         entities_data = data[level]['entities']
-        bg_index = data[level]['background']
+        
+        # Parse background từ 'type' (LevelA, LevelB, LevelC, LevelD)
+        level_type = data[level].get('type', 'LevelA')
+        bg_map = {'LevelA': 0, 'LevelB': 1, 'LevelC': 2, 'LevelD': 3}
+        bg_index = bg_map.get(level_type, 0)
         bg = backgrounds[bg_index] if bg_index < len(backgrounds) else backgrounds[0]
         
-        print(f"🔄 LOAD_LEVEL: Original level {level} has {len(entities_data)} entities")
-        
         items = create_entities_from_data(entities_data, is_clover, is_gem, is_rock)
-        print(f"🔄 LOAD_LEVEL: Created {len(items)} items from original level")
         return bg, items
         
     except Exception as e:
@@ -164,27 +157,18 @@ def create_entities_from_data(entities_data, is_clover=False, is_gem=False, is_r
     """Tạo entities từ dữ liệu entities_data - hỗ trợ cả 2 định dạng"""
     items = []  # Sử dụng list thay vì pygame.sprite.Group
     
-    print(f"DEBUG: Total entities to process: {len(entities_data)}")
-    
     for i, entity in enumerate(entities_data):
         try:
-            print(f"DEBUG: Processing entity {i}: {entity}")
-            
             # XỬ LÝ ĐỊNH DẠNG ORIGINAL LEVELS (có 'type', 'pos')
             if 'type' in entity and 'pos' in entity:
                 entity_type = entity['type']
                 x = entity['pos']['x']
                 y = entity['pos']['y']
                 
-                print(f"DEBUG: Original format - Type: {entity_type}, Pos: ({x}, {y})")
-                
                 # Sử dụng hàm load_item cũ cho original levels
                 item = load_item(entity, is_clover, is_gem, is_rock)
                 if item:
                     items.append(item)
-                    print(f"DEBUG: Successfully created {entity_type}")
-                else:
-                    print(f"DEBUG: Failed to create {entity_type}")
                     
             # XỬ LÝ ĐỊNH DẠNG GENERATED LEVELS (có 'type', 'x', 'y')  
             elif 'x' in entity and 'y' in entity and 'type' in entity:
@@ -192,8 +176,6 @@ def create_entities_from_data(entities_data, is_clover=False, is_gem=False, is_r
                 x = entity['x']
                 y = entity['y']
                 value = entity.get('value', 0)
-                
-                print(f"DEBUG: Generated format - Type: {entity_type}, Pos: ({x}, {y})")
                 
                 # Xử lý các loại entity cho generated levels
                 if entity_type == 'gold':
@@ -226,7 +208,6 @@ def create_entities_from_data(entities_data, is_clover=False, is_gem=False, is_r
             traceback.print_exc()
             continue
     
-    print(f"DEBUG: Created {len(items)} items total")
     return items
 def random_level(level_number, use_generated=False):
     """Chọn level ngẫu nhiên - có thể dùng generated levels"""

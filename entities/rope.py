@@ -35,13 +35,25 @@ class Rope:
         if self.timer <= 0:
             if self.state == 'swinging':
                 # print(self.x2,self.y2,self.length,self.direction)
-                self.direction += self.speed_swinging * dt
+                # Giới hạn delta angle để tránh skip qua boundary khi game speed cao
+                delta_angle = self.speed_swinging * dt
+                new_direction = self.direction + delta_angle
+                
+                # Kiểm tra và clamp góc trong khoảng [15, 165]
+                if new_direction > 165:
+                    new_direction = 165
+                    self.speed_swinging = -self.speed_swinging
+                elif new_direction < 15:
+                    new_direction = 15
+                    self.speed_swinging = -self.speed_swinging
+                
+                self.direction = new_direction
+                
                 if self.y2 < 54 or self.direction < 14 or self.direction > 166: #fix ket
                     self.y2 = self.y1 + 50
                     self.length = 50
                     self.direction = 90
-                if self.direction > 165 or self.direction < 15:
-                    self.speed_swinging = -self.speed_swinging
+                    
                 self.x2 = self.x1 + self.length * math.cos(math.radians(self.direction))
                 self.y2 = self.y1 + self.length * math.sin(math.radians(self.direction))
 
@@ -94,6 +106,9 @@ class Rope:
                                 self.text_size =0
                                 self.time_text = 0
                                 self.have_TNT +=1
+                                # Cập nhật số dynamite trong global state và đồng bộ lại
+                                from define import set_dynamite_count
+                                self.have_TNT = set_dynamite_count(self.have_TNT)  # set_dynamite_count trả về giá trị đã giới hạn
                             elif self.item.point == -2 and self.is_use_TNT == False:
                                 self.text = "strength"
                                 self.text_direction = "left"

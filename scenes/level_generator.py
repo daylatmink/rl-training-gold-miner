@@ -208,7 +208,7 @@ class LevelGenerator:
             "spawn_rules": {
                 "x_range": (50, 1200),
                 "y_range": (200, 650),
-                "min_distance": 40,
+                "min_distance": 100,  # Tăng từ 40 lên 100 để items thưa hơn, khó bấm mò trúng
                 "regions": {
                     "top": {"y_range": (200, 350), "density": 0.3},
                     "middle": {"y_range": (350, 500), "density": 0.4},
@@ -225,26 +225,23 @@ class LevelGenerator:
                 }
             },
             "difficulty_profiles": {
-                "easy": {"total_entities": (12, 18), "value_ratio": 0.8},
-                "medium": {"total_entities": (15, 22), "value_ratio": 0.7},
-                "hard": {"total_entities": (18, 25), "value_ratio": 0.6},
-                "expert": {"total_entities": (20, 28), "value_ratio": 0.5}
+                "easy": {"total_entities": (8, 12), "value_ratio": 0.8},      # Giảm từ 12-18 xuống 8-12
+                "medium": {"total_entities": (10, 15), "value_ratio": 0.7},   # Giảm từ 15-22 xuống 10-15
+                "hard": {"total_entities": (12, 18), "value_ratio": 0.6},     # Giảm từ 18-25 xuống 12-18
+                "expert": {"total_entities": (15, 20), "value_ratio": 0.5}    # Giảm từ 20-28 xuống 15-20
             }
         }
     def generate_level(self, level_id: str, difficulty: str = "medium") -> Dict:
         """Tạo level ngẫu nhiên - HỖ TRỢ TẤT CẢ BIẾN THỂ"""
         
-        print(f"   🎯 GENERATOR: Generating level with base difficulty: {difficulty}")
-        
-        # 🎯 XỬ LÝ TẤT CẢ BIẾN THỂ (easy, medium, hard, expert)
+        # XỬ LÝ TẤT CẢ BIẾN THỂ (easy, medium, hard, expert)
         actual_difficulty = difficulty
         
-        # 🎯 NẾU LÀ DIFFICULTY CƠ BẢN → CHỌN BIẾN THỂ TƯƠNG ỨNG
+        # NẾU LÀ DIFFICULTY CƠ BẢN → CHỌN BIẾN THỂ TƯƠNG ỨNG
         if difficulty in ["easy", "medium", "hard", "expert"]:
             actual_difficulty = self._calculate_difficulty_weights(difficulty)
-            print(f"   🎯 Selected variant: {actual_difficulty}")
         
-        # 🎯 Lấy profile từ difficulty gốc (không phải biến thể)
+        # Lấy profile từ difficulty gốc (không phải biến thể)
         profile_key = difficulty  # Dùng difficulty gốc để lấy profile
         if profile_key not in self.config["difficulty_profiles"]:
             profile_key = "medium"
@@ -299,60 +296,34 @@ class LevelGenerator:
             entity_type = entity['type']
             entity_count[entity_type] = entity_count.get(entity_type, 0) + 1
         
-        print(f"📈 Entity distribution: {entity_count}")
-        
-        # 🎯 THÊM THÔNG TIN ĐẶC BIỆT THEO BIẾN THỂ
-        if "diamond" in actual_difficulty.lower():
-            diamond_count = entity_count.get("Diamond", 0) + entity_count.get("MoleWithDiamond", 0)
-            print(f"💎 Total diamonds: {diamond_count}")
-        
-        if "gold" in actual_difficulty.lower():
-            gold_count = sum(entity_count.get(et, 0) for et in ["MiniGold", "NormalGold", "BigGold"])
-            print(f"🟡 Total gold: {gold_count}")
-        
-        if "rock" in actual_difficulty.lower():
-            rock_count = sum(entity_count.get(et, 0) for et in ["MiniRock", "NormalRock", "BigRock"])
-            print(f"🪨 Total rocks: {rock_count}")
-        
-        if "bone" in actual_difficulty.lower() or "skull" in actual_difficulty.lower():
-            bone_count = entity_count.get("Bone", 0) + entity_count.get("Skull", 0)
-            print(f"💀 Total bones/skulls: {bone_count}")
-        
-        print(f"{'='*50}\n")
-        
         return level_data
     def _get_entity_distribution(self, difficulty: str, total_entities: int) -> Dict:
         """Phân phối entity types dựa trên difficulty - SỬ DỤNG CONFIG RIÊNG"""
         
-        # 🎯 LẤY CONFIG THEO DIFFICULTY
+        # LẤY CONFIG THEO DIFFICULTY
         entity_configs = self.config["entity_types_by_difficulty"]
         
         if difficulty in entity_configs:
             entity_config = entity_configs[difficulty]
-            print(f"   🎯 DEBUG: Using specific config for '{difficulty}'")
         else:
             # Fallback: nếu không tìm thấy config, dùng config cho difficulty cơ bản
             base_difficulty = difficulty.split('_')[-1] if '_' in difficulty else difficulty
             if base_difficulty in ["easy", "medium", "hard"]:
                 entity_config = entity_configs[base_difficulty]
-                print(f"   ⚠️  DEBUG: Using fallback config for '{base_difficulty}'")
             else:
                 entity_config = entity_configs["medium"]
-                print(f"   ⚠️  DEBUG: Using default config 'medium'")
         
-        # 🎯 TẠO PRIORITY ORDER
+        # TẠO PRIORITY ORDER
         priority_order = sorted(
             [et for et in entity_config.keys() if entity_config[et]["weight"] > 0],
             key=lambda et: entity_config[et]["weight"],
             reverse=True
         )
         
-        print(f"   🎯 DEBUG: Priority order: {priority_order}")
-        
         distribution = {}
         entities_left = total_entities
         
-        # 🎯 PHÂN PHỐI VẬT PHẨM THEO ĐỘ ƯU TIÊN
+        # PHÂN PHỐI VẬT PHẨM THEO ĐỘ ƯU TIÊN
         for entity_type in priority_order:
             if entities_left <= 0:
                 break
@@ -372,21 +343,16 @@ class LevelGenerator:
             if count > 0:
                 distribution[entity_type] = count
                 entities_left -= count
-                print(f"   🎯 DEBUG: {entity_type}: {count} items (weight: {weight_factor})")
         
-        # 🎯 SỬA TRIỆT ĐỂ: XỬ LÝ SỐ LƯỢNG CÒN LẠI - DÙNG get() ĐỂ TRÁNH KEYERROR
+        # XỬ LÝ SỐ LƯỢNG CÒN LẠI
         if entities_left > 0:
-            print(f"   🎯 DEBUG: Distributing {entities_left} remaining entities")
-            
-            # Tạo danh sách các type có thể nhận thêm (AN TOÀN)
+            # Tạo danh sách các type có thể nhận thêm
             available_types = []
             for entity_type in priority_order:
-                current_count = distribution.get(entity_type, 0)  # 🎯 DÙNG get() ĐỂ TRÁNH KEYERROR
+                current_count = distribution.get(entity_type, 0)
                 max_allowed = entity_config[entity_type]["max"]
                 if current_count < max_allowed:
                     available_types.append(entity_type)
-            
-            print(f"   🎯 DEBUG: Available types for distribution: {available_types}")
             
             # Phân phối số entities còn lại
             while entities_left > 0 and available_types:
@@ -400,19 +366,16 @@ class LevelGenerator:
                     if current_count < max_allowed:
                         distribution[entity_type] = current_count + 1
                         entities_left -= 1
-                        print(f"   🎯 DEBUG: Added 1 to {entity_type}, now {distribution[entity_type]}")
                         
                         # Nếu đã đạt max, loại khỏi available_types
                         if distribution[entity_type] >= max_allowed:
                             available_types.remove(entity_type)
-                            print(f"   🎯 DEBUG: {entity_type} reached max, removed from available")
                 
                 # Nếu không còn type nào available mà vẫn còn entities
                 if entities_left > 0 and not available_types:
-                    print(f"   ⚠️  WARNING: No more available types, {entities_left} entities left unused")
                     break
         
-        # 🎯 ĐẢM BẢO MIN COUNT CHO CÁC ENTITY QUAN TRỌNG
+        # ĐẢM BẢO MIN COUNT CHO CÁC ENTITY QUAN TRỌNG
         for entity_type in priority_order:
             min_count = entity_config[entity_type]["min"]
             current_count = distribution.get(entity_type, 0)
@@ -426,15 +389,12 @@ class LevelGenerator:
                         print(f"   🎯 DEBUG: Transferred 1 from {reduce_type} to {entity_type} to meet min requirement")
                         break
         
-        print(f"   📊 DEBUG: Final distribution: {distribution}")
-        print(f"   📊 DEBUG: Total entities: {sum(distribution.values())}")
-        
         return distribution
     def _calculate_difficulty_weights(self, difficulty: str) -> str:
         """Tính toán weights - CHỌN BIẾN THỂ NGẪU NHIÊN CÂN BẰNG"""
         
         if difficulty == "hard":
-            # 🎯 4 BIẾN THỂ CHO HARD
+            # 4 BIẾN THỂ CHO HARD
             hard_variants = [
                 "hard",              # Hard gốc
                 "hard_speed_run",    # Chạy đua
@@ -442,13 +402,12 @@ class LevelGenerator:
                 "hard_lottery"       # Xổ số may mắn
             ]
             
-            # 🎯 THÊM LOGIC TRÁNH LẶP LIÊN TIẾP
+            # THÊM LOGIC TRÁNH LẶP LIÊN TIẾP
             selected_variant = self._get_balanced_variant(hard_variants, "hard")
-            print(f"   🎯 Selected hard variant: {selected_variant}")
             return selected_variant
             
         elif difficulty == "expert":
-            # 🎯 6 BIẾN THỂ CHO EXPERT
+            # 6 BIẾN THỂ CHO EXPERT
             expert_variants = [
                 "expert_diamond_moles",  # Diamond + Moles
                 "expert_gold_rocks",     # Vàng + Đá
@@ -458,9 +417,8 @@ class LevelGenerator:
                 "expert_risk_reward"     # Cân bằng nguy hiểm
             ]
             
-            # 🎯 THÊM LOGIC TRÁNH LẶP LIÊN TIẾP
+            # THÊM LOGIC TRÁNH LẶP LIÊN TIẾP
             selected_variant = self._get_balanced_variant(expert_variants, "expert")
-            print(f"   🎯 Selected expert variant: {selected_variant}")
             return selected_variant
             
         else:
@@ -485,7 +443,6 @@ class LevelGenerator:
                 other_variants = [v for v in variants if v != last_two[0]]
                 if other_variants:
                     selected = random.choice(other_variants)
-                    print(f"   🔄 Avoiding repetition '{last_two[0]}' → '{selected}'")
                     
                     # Cập nhật lịch sử
                     recent_variants.append(selected)
@@ -495,7 +452,7 @@ class LevelGenerator:
                     
                     return selected
         
-        # 🎯 CHỌN NGẪU NHIÊN BÌNH THƯỜNG
+        # CHỌN NGẪU NHIÊN BÌNH THƯỜNG
         selected = random.choice(variants)
         
         # Cập nhật lịch sử
@@ -556,29 +513,21 @@ class ProceduralLevelManager:
     
     def get_level(self, level_id: str, difficulty: str = None) -> Dict:
         """Lấy level - generate nếu chưa tồn tại"""
-        print(f"\n🔍 LEVEL MANAGER: Requesting level '{level_id}' with difficulty '{difficulty}'")
         
         if level_id not in self.generated_levels:
             if difficulty is None:
                 # Auto difficulty progression
                 level_num = self._extract_level_number(level_id)
-                # 🎯 SỬA: Level vô hạn - lặp lại progression
+                # Level vô hạn - lặp lại progression
                 progression_index = (level_num - 1) % len(self.difficulty_progression)
                 difficulty = self.difficulty_progression[progression_index]
-                print(f"   🎯 Auto-detected difficulty: {difficulty} for level {level_num}")
-            else:
-                print(f"   🎯 Using provided difficulty: {difficulty}")
             
-            # 🎯 SỬA: Đảm bảo difficulty hợp lệ
+            # Đảm bảo difficulty hợp lệ
             valid_difficulties = ["easy", "medium", "hard", "expert"]
             if difficulty not in valid_difficulties:
-                print(f"   ⚠️  Invalid difficulty '{difficulty}', using 'medium'")
                 difficulty = "medium"
             
-            print(f"   🏗️  Generating new level with difficulty: {difficulty}")
             self.generated_levels[level_id] = self.generator.generate_level(level_id, difficulty)
-        else:
-            print(f"   📂 Using cached level")
         
         return self.generated_levels[level_id]
     
