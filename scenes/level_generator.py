@@ -14,14 +14,14 @@ class LevelGenerator:
             "entity_types_by_difficulty": {
                 "easy": {
                     # 🎯 EASY: Chỉ vàng + đá + ít túi, không có vật phẩm đặc biệt
-                    "MiniRock": {"weight": 0.4, "min": 2, "max": 5},
-                    "NormalRock": {"weight": 0.3, "min": 1, "max": 3},
-                    "BigRock": {"weight": 0.0, "min": 0, "max": 0},      # KHÔNG có đá to
-                    "MiniGold": {"weight": 0.8, "min": 6, "max": 10},
-                    "NormalGold": {"weight": 0.6, "min": 3, "max": 6},
-                    "BigGold": {"weight": 0.5, "min": 2, "max": 3},      # 2-3 BigGold
-                    "Diamond": {"weight": 0.0, "min": 0, "max": 0},      # KHÔNG có diamond
-                    "QuestionBag": {"weight": 0.2, "min": 0, "max": 2},  # Rất ít túi
+                    "MiniRock": {"weight": 0.4, "min": 3, "max": 7},     # Tăng từ 2-5 lên 3-7
+                    "NormalRock": {"weight": 0.3, "min": 2, "max": 5},   # Tăng từ 1-3 lên 2-5
+                    "BigRock": {"weight": 0.0, "min": 0, "max": 0},
+                    "MiniGold": {"weight": 0.8, "min": 8, "max": 14},    # Tăng từ 6-10 lên 8-14
+                    "NormalGold": {"weight": 0.6, "min": 5, "max": 9},   # Tăng từ 3-6 lên 5-9
+                    "BigGold": {"weight": 0.5, "min": 3, "max": 5},      # Tăng từ 2-3 lên 3-5
+                    "Diamond": {"weight": 0.0, "min": 0, "max": 0},
+                    "QuestionBag": {"weight": 0.2, "min": 0, "max": 3},  # Tăng từ 0-2 lên 0-3
                     "Mole": {"weight": 0.0, "min": 0, "max": 0},
                     "MoleWithDiamond": {"weight": 0.0, "min": 0, "max": 0},
                     "TNT": {"weight": 0.0, "min": 0, "max": 0},
@@ -208,11 +208,11 @@ class LevelGenerator:
             "spawn_rules": {
                 "x_range": (50, 1200),
                 "y_range": (200, 650),
-                "min_distance": 100,  # Tăng từ 40 lên 100 để items thưa hơn, khó bấm mò trúng
+                "min_distance": 100,  # Giảm từ 100 xuống 60 để items dày hơn
                 "regions": {
-                    "top": {"y_range": (200, 350), "density": 0.3},
-                    "middle": {"y_range": (350, 500), "density": 0.4},
-                    "bottom": {"y_range": (500, 650), "density": 0.3}
+                    "top": {"y_range": (200, 350), "density": 0.2},     # Tăng từ 0.3 lên 0.35
+                    "middle": {"y_range": (350, 500), "density": 0.3},  # Tăng từ 0.4 lên 0.45
+                    "bottom": {"y_range": (500, 650), "density": 0.2}   # Tăng từ 0.3 lên 0.35
                 },
                 # 🎯 SPAWN RULES ĐẶC BIỆT THEO DIFFICULTY
                 "difficulty_spawn_rules": {
@@ -225,10 +225,10 @@ class LevelGenerator:
                 }
             },
             "difficulty_profiles": {
-                "easy": {"total_entities": (8, 12), "value_ratio": 0.8},      # Giảm từ 12-18 xuống 8-12
-                "medium": {"total_entities": (10, 15), "value_ratio": 0.7},   # Giảm từ 15-22 xuống 10-15
-                "hard": {"total_entities": (12, 18), "value_ratio": 0.6},     # Giảm từ 18-25 xuống 12-18
-                "expert": {"total_entities": (15, 20), "value_ratio": 0.5}    # Giảm từ 20-28 xuống 15-20
+                "easy": {"total_entities": (10, 15), "value_ratio": 0.8},      # Tăng từ 8-12 lên 15-22
+                "medium": {"total_entities": (18, 28), "value_ratio": 0.7},    # Tăng từ 10-15 lên 18-28
+                "hard": {"total_entities": (22, 32), "value_ratio": 0.6},      # Tăng từ 12-18 lên 22-32
+                "expert": {"total_entities": (25, 35), "value_ratio": 0.5}     # Tăng từ 15-20 lên 25-35
             }
         }
     def generate_level(self, level_id: str, difficulty: str = "medium") -> Dict:

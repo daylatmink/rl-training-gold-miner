@@ -116,7 +116,7 @@ class Rope:
                                 self.text_size =0
                                 self.time_text = 0
                                 self.buff_speed = 2 #strength
-                        self.timer = 200
+                        self.timer = 400  # Tăng từ 200 lên 400 (cooldown gấp đôi)
                         del self.item
                         self.item = None
                         self.speed_swinging = 0

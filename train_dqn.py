@@ -54,7 +54,8 @@ class DQNTrainer:
         batch_size: int = 64,
         target_update_freq: int = 1000,
         train_freq: int = 1,  # Tần suất training: train mỗi train_freq steps
-        num_planning: int = 1,  # Số batches train mỗi lần gọi train_step (DQN chuẩn: 1 batch)
+        num_planning: int = 1,  # Số lần quét buffer (planning) hoặc số batches (standard)
+        use_planning: bool = True,  # True: planning approach, False: standard DQN
         device: str = 'cuda' if torch.cuda.is_available() else 'cpu'
     ):
         self.env = env
@@ -70,6 +71,7 @@ class DQNTrainer:
         self.target_update_freq = target_update_freq
         self.train_freq = train_freq
         self.num_planning = num_planning
+        self.use_planning = use_planning
         
         # Target network
         self.target_agent = Qtention(
@@ -178,19 +180,30 @@ class DQNTrainer:
     
     def train_step(self, cur_step) -> list:
         """
-        Planning approach: Quét qua toàn bộ buffer num_planning lần
-        Mỗi planning step: quét qua toàn bộ buffer, mỗi phần tử một lần
-        Batch cuối cùng có thể có size nhỏ hơn batch_size
+        Training step với 2 modes:
+        - Planning approach: Quét qua toàn bộ buffer num_planning lần
+        - Standard DQN: Sample num_planning batches ngẫu nhiên
         
         Args:
             cur_step: Current step number (for logging)
         
         Returns:
-            losses: List of losses cho mỗi lần quét (num_planning lần)
+            losses: List of losses
         """
         if len(self.replay_buffer) == 0:
             return []
         
+        if self.use_planning:
+            return self._train_step_planning(cur_step)
+        else:
+            return self._train_step_standard(cur_step)
+    
+    def _train_step_planning(self, cur_step) -> list:
+        """
+        Planning approach: Quét qua toàn bộ buffer num_planning lần
+        Mỗi planning step: quét qua toàn bộ buffer, mỗi phần tử một lần
+        Batch cuối cùng có thể có size nhỏ hơn batch_size
+        """
         losses = []
         
         # Quét qua buffer num_planning lần
@@ -210,33 +223,8 @@ class DQNTrainer:
                 batch_end = min(batch_start + self.batch_size, total_samples)
                 batch = all_transitions[batch_start:batch_end]
                 
-                states, actions, rewards, next_states, dones = zip(*batch)
-                
-                # Convert to tensors
-                actions = torch.tensor(actions, dtype=torch.long, device=self.device)
-                rewards = torch.tensor(rewards, dtype=torch.float32, device=self.device)
-                dones = torch.tensor(dones, dtype=torch.float32, device=self.device)
-                
-                # Compute Q(s, a)
-                q_values = self.agent(list(states))
-                q_values = q_values.gather(1, actions.unsqueeze(1)).squeeze(1)
-                
-                # Compute target
-                with torch.no_grad():
-                    next_q_values = self.target_agent(list(next_states))
-                    next_q_values = next_q_values.max(1)[0]
-                    targets = rewards + self.gamma * next_q_values * (1 - dones)
-                
-                # Compute loss
-                loss = self.loss_fn(q_values, targets)
-                
-                # Backprop
-                self.optimizer.zero_grad()
-                loss.backward()
-                torch.nn.utils.clip_grad_norm_(self.agent.parameters(), max_norm=10.0)
-                self.optimizer.step()
-                
-                iter_loss += loss.item()
+                loss = self._train_on_batch(batch)
+                iter_loss += loss
                 num_batches += 1
             
             # Tính avg loss cho lần quét này
@@ -245,9 +233,70 @@ class DQNTrainer:
             
             # Log loss cho mỗi lần quét
             if cur_step % 600 == 0:
-                self.log(f"Step {cur_step % 3600}/3600  Planning {planning_iter+1}/{self.num_planning} - Avg Loss: {avg_iter_loss:.4f} - Batches: {num_batches}/{(total_samples + self.batch_size - 1) // self.batch_size} - Buffer: {total_samples}")
+                self.log(f"Step {cur_step % 3600}/3600  Planning {planning_iter+1}/{self.num_planning} - Avg Loss: {avg_iter_loss:.8f} - Batches: {num_batches}/{(total_samples + self.batch_size - 1) // self.batch_size} - Buffer: {total_samples}")
         
         return losses
+    
+    def _train_step_standard(self, cur_step) -> list:
+        """
+        Standard DQN: Sample num_planning batches ngẫu nhiên và train
+        """
+        if len(self.replay_buffer) < self.batch_size:
+            return []
+        
+        losses = []
+        
+        # Sample và train trên num_planning batches
+        for batch_idx in range(self.num_planning):
+            # Sample random batch
+            batch = self.replay_buffer.sample(self.batch_size)
+            
+            loss = self._train_on_batch(batch)
+            losses.append(loss)
+            
+            # Log loss cho mỗi batch
+            if cur_step % 600 == 0:
+                self.log(f"Step {cur_step % 3600}/3600  Batch {batch_idx+1}/{self.num_planning} - Loss: {loss:.8f} - Buffer: {len(self.replay_buffer)}")
+        
+        return losses
+    
+    def     _train_on_batch(self, batch) -> float:
+        """
+        Train trên một batch và trả về loss
+        
+        Args:
+            batch: List of transitions
+            
+        Returns:
+            loss: Loss value
+        """
+        states, actions, rewards, next_states, dones = zip(*batch)
+        
+        # Convert to tensors
+        actions = torch.tensor(actions, dtype=torch.long, device=self.device)
+        rewards = torch.tensor(rewards, dtype=torch.float32, device=self.device)
+        dones = torch.tensor(dones, dtype=torch.float32, device=self.device)
+        
+        # Compute Q(s, a)
+        q_values = self.agent(list(states))
+        q_values = q_values.gather(1, actions.unsqueeze(1)).squeeze(1)
+        
+        # Compute target
+        with torch.no_grad():
+            next_q_values = self.target_agent(list(next_states))
+            next_q_values = next_q_values.max(1)[0]
+            targets = rewards + self.gamma * next_q_values * (1 - dones)
+        
+        # Compute loss
+        loss = self.loss_fn(q_values, targets)
+        
+        # Backprop
+        self.optimizer.zero_grad()
+        loss.backward()
+        torch.nn.utils.clip_grad_norm_(self.agent.parameters(), max_norm=10.0)
+        self.optimizer.step()
+        
+        return loss.item()
     
     def train_episode(self) -> Tuple[float, int]:
         """
@@ -269,15 +318,7 @@ class DQNTrainer:
             next_state, reward, terminated, truncated, info = self.env.step(action)
             done = terminated or truncated
             
-            # Store transition CHỈ KHI dùng model để quyết định
-            # if not used_model:
-            #     if done:
-            #         break
-            #     state = next_state
-            #     episode_reward += reward
-            #     continue
-            if used_model:
-                self.replay_buffer.push(state, action, reward, next_state, done)
+            self.replay_buffer.push(state, action, reward, next_state, done)
             
             # Train CHỈ KHI đạt train_freq
             
@@ -286,8 +327,9 @@ class DQNTrainer:
             if self.total_steps % self.target_update_freq == 0:
                 self.update_target_network()
 
-            if self.total_steps % 100 == 0:
-                self.log(f"Episode step {episode_steps} reward: {episode_reward}")
+            if self.total_steps % self.train_freq == 0:
+                if self.total_steps % 600 == 0:
+                    self.log(f"Episode step {episode_steps} reward: {episode_reward}")
                 losses = self.train_step(self.total_steps)
                 if losses:  # Nếu có loss (buffer đủ lớn)
                     self.losses.extend(losses)  # Thêm tất cả losses vào list
@@ -357,9 +399,9 @@ class DQNTrainer:
                 
                 self.log(f"Episode {episode}/{num_episodes} | "
                       f"Reward: {episode_reward:.3f} | "
-                      f"Avg(10): {avg_reward:.3f} | "
+                      f"Avg(10): {avg_reward:.8f} | "
                       f"Steps: {episode_steps} | "
-                      f"Loss: {avg_loss:.4f} | "
+                      f"Loss: {avg_loss:.8f} | "
                       f"Epsilon: {self.epsilon:.3f} | "
                       f"Buffer: {len(self.replay_buffer)}")
             

@@ -20,18 +20,19 @@ def main_train(headless: bool = False, checkpoint: str = None):
     config = {
         'num_episodes': 1000,
         'lr': 3e-4,
-        'gamma': 1,
-        'epsilon_start': 0.1,    # Tăng exploration ban đầu để học cả 2 actions
-        'epsilon_end': 0.001,     # Giữ một chút exploration
-        'epsilon_decay': 0.995,  # Decay chậm hơn: 0.3 -> 0.01 trong ~500 episodes
-        'buffer_size': 4000,
+        'gamma': 0.99,
+        'epsilon_start': 0.3,    # Tăng exploration ban đầu để học cả 2 actions
+        'epsilon_end': 0.01,     # Giữ một chút exploration
+        'epsilon_decay': 0.9,  # Decay chậm hơn: 0.3 -> 0.01 trong ~500 episodes
+        'buffer_size': 50000,
         'batch_size': 128,
-        'target_update_freq': 1000,
+        'target_update_freq': 1,
         'train_freq': 1,         # Train mỗi bao nhiêu steps
-        'num_planning': 4,       # Số lần quét qua toàn bộ buffer mỗi lần train (planning approach)
+        'num_planning': 1,       # Số lần quét buffer (planning) hoặc số batches (standard)
+        'use_planning': False,    # True: planning approach, False: standard DQN
         'save_freq': 1,
         'eval_freq': 200,
-        'eval_episodes': 5,
+        'eval_episodes': 500,
         'headless': headless,     # Headless mode
     }
     
@@ -54,8 +55,8 @@ def main_train(headless: bool = False, checkpoint: str = None):
         use_generated_levels=True,
         c_dyna=10,       # Cost của dynamite
         c_step=0.0,        # Step cost (0 = không dùng)
-        c_pull=0.3,        # Penalty khi đang kéo (0 = không dùng)
-        reward_scale=1000.0,  # Scale reward xuống 1000 lần
+        c_pull=0.0,        # Penalty khi đang kéo (0 = không dùng)
+        reward_scale=10000.0,  # Scale reward xuống 1000 lần
         game_speed=1       # Giữ 1x để physics chính xác, headless đã đủ nhanh
     )
     print("✓ Environment created")
@@ -68,7 +69,7 @@ def main_train(headless: bool = False, checkpoint: str = None):
         nhead=4,
         n_layers=2,
         d_ff=24,
-        dropout=0.01,
+        dropout=0.00,
         max_items=30
     )
     
@@ -92,9 +93,11 @@ def main_train(headless: bool = False, checkpoint: str = None):
         batch_size=config['batch_size'],
         target_update_freq=config['target_update_freq'],
         train_freq=config['train_freq'],
-        num_planning=config['num_planning']
+        num_planning=config['num_planning'],
+        use_planning=config['use_planning']
     )
     print(f"✓ Trainer created on device: {trainer.device}")
+    print(f"  Training mode: {'Planning' if config['use_planning'] else 'Standard DQN'}")
     
     # Load checkpoint if provided
     if checkpoint:
@@ -144,4 +147,4 @@ if __name__ == '__main__':
     
     # Nếu dùng --show thì headless=False (hiển thị), ngược lại headless=True (không hiển thị)
     main_train(headless=not args.show, checkpoint=args.checkpoint)
-    # main_train(headless=args.show)
+    # main_train(headless=False, checkpoint='C:\\Users\\User\\Documents\\code\\rl-training-gold-miner\\checkpoints\\checkpoint_copy.pt')

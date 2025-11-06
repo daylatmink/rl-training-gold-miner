@@ -42,10 +42,25 @@ class Qtention(nn.Module):
         # Embedding
         self.embedder = Embedder(d_model=d_model, dropout=dropout, max_items=max_items)
 
-        # Khởi tạo nhẹ
-        nn.init.normal_(self.act_emb, mean=0.0, std=0.02)
-        nn.init.xavier_uniform_(self.head.weight)
-        nn.init.zeros_(self.head.bias)
+        # Khởi tạo để action 0 có Q-value cao hơn action 1 LUÔN LUÔN
+        # Strategy: Tạo gap lớn giữa act_emb[0] và act_emb[1]
+        
+        # 1. Init head với weights DƯƠNG (quan trọng!)
+        with torch.no_grad():
+            # Weights dương → Q sẽ tăng theo embedding value
+            self.head.weight.data.uniform_(0.0, 0.02)  # Toàn dương
+            self.head.bias.data.fill_(0.0)
+        
+        # 2. Init action embeddings với gap lớn
+        with torch.no_grad():
+            # ACT0: embedding dương LỚN → Q(act0) cao
+            self.act_emb.data[0] = torch.ones(d_model) * 0.5  # Tăng từ 0.1 lên 0.5
+            # ACT1: embedding âm NHỎ → Q(act1) thấp
+            self.act_emb.data[1] = torch.ones(d_model) * (-0.5)  # Giảm từ -0.1 xuống -0.5
+            
+            # Thêm một chút noise nhỏ
+            self.act_emb.data[0] += torch.randn(d_model) * 0.01
+            self.act_emb.data[1] += torch.randn(d_model) * 0.01
 
     def forward(self, x_state):
         """
