@@ -50,7 +50,7 @@ def main_train(headless: bool = False, checkpoint: str = None):
     print(f"  Render mode: {render_mode} ({'with display' if not headless else 'headless - no window'})")
     env = GoldMinerEnv(
         render_mode=render_mode,  # None = headless (không mở cửa sổ), 'human' = hiển thị
-        max_steps=3600,    # 60 giây * 60 FPS
+        max_steps=3600 * 5,    # 60 giây * 60 FPS
         level=0,           # level=0 → difficulty "train"
         use_generated_levels=True,
         c_dyna=10,       # Cost của dynamite
