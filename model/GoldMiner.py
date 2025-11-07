@@ -150,7 +150,8 @@ class GoldMinerEnv(gym.Env):
             is_clover=False,
             is_gem=False,
             is_rock=False,
-            use_generated=self.use_generated_levels
+            use_generated=self.use_generated_levels,
+            time_limit=self.max_steps // 60  # Convert steps to seconds (60 FPS)
         )
         
         self.steps = 0

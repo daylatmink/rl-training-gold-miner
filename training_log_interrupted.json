@@ -1,33 +1,17 @@
 {
-  "timestamp": "2025-11-07T13:30:45.571096",
-  "total_episodes": 7,
-  "total_steps": 28612,
-  "final_epsilon": 0.1677721600000001,
-  "episode_rewards": [
-    -0.05131999999999807,
-    -0.041859999999997816,
-    -0.028479999999999023,
-    -0.004679999999999627,
-    0.025680000000001674,
-    0.04760000000000078,
-    -0.009859999999999482
-  ],
-  "episode_lengths": [
-    3600,
-    3600,
-    3600,
-    3600,
-    3600,
-    3600,
-    3600
-  ],
+  "timestamp": "2025-11-07T15:07:05.299076",
+  "total_episodes": 0,
+  "total_steps": 1575,
+  "final_epsilon": 0.8,
+  "episode_rewards": [],
+  "episode_lengths": [],
   "hyperparameters": {
     "gamma": 0.99,
     "epsilon_start": 0.5,
     "epsilon_end": 0.01,
-    "epsilon_decay": 0.8,
-    "batch_size": 16,
-    "target_update_freq": 500,
+    "epsilon_decay": 0.99,
+    "batch_size": 32,
+    "target_update_freq": 100,
     "buffer_size": 50000
   }
 }

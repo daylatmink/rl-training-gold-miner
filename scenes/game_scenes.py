@@ -279,9 +279,10 @@ class StoreScene(object):
         reset_scaled_time()  # Reset scaled time khi bắt đầu level mới
         self.manager.go_to(GameScene(get_level(), tnt, speed, clover, gem, rock, use_generated=USE_GENERATED_LEVELS))
 class GameScene(Scene):
-    def __init__(self, level, tnt=0, speed=1, is_clover=False, is_gem=False, is_rock=False, use_generated=None):
+    def __init__(self, level, tnt=0, speed=1, is_clover=False, is_gem=False, is_rock=False, use_generated=None, time_limit=60):
         super(GameScene, self).__init__()
         self.level = level
+        self.time_limit = time_limit  # Thời gian giới hạn (giây)
         
         # THÊM: Xác định có dùng generated levels không
         if use_generated is None:
@@ -432,7 +433,7 @@ class GameScene(Scene):
     def update(self, screen):
         from define import get_scaled_time_offset
         # Tính thời gian còn lại dựa trên scaled time thay vì real time
-        self.timer = 60 - int(get_scaled_time_offset())
+        self.timer = self.time_limit - int(get_scaled_time_offset())
         screen.blit(self.text_font.render("Tiền:", True, (0, 0, 0)), (5, 0))
         screen.blit(self.text_font.render("$"+str(get_score()), True, (0, 150, 0)), (55, 0))
         screen.blit(self.text_font.render("Mục tiêu:", True, (0, 0, 0)), (5, 25))
@@ -460,7 +461,7 @@ class GameScene(Scene):
             # Xóa items sau khi đã lặp xong
             for item in items_to_remove:
                 self.items.remove(item)
-            self.timer = 60 - int(pygame.time.get_ticks()/1000 - get_time())
+            self.timer = self.time_limit - int(pygame.time.get_ticks()/1000 - get_time())
             screen.blit(self.text_font.render("Tiền:", True, (0, 0, 0)), (5, 0))
             screen.blit(self.text_font.render("$"+str(get_score()), True, (0, 150, 0)), (55, 0))
             screen.blit(self.text_font.render("Mục tiêu:", True, (0, 0, 0)), (5, 25))
@@ -538,7 +539,7 @@ class GameScene(Scene):
     def update(self, screen):
         from define import get_scaled_time_offset
         # Tính thời gian còn lại dựa trên scaled time thay vì real time
-        self.timer = 60 - int(get_scaled_time_offset())
+        self.timer = self.time_limit - int(get_scaled_time_offset())
         screen.blit(self.text_font.render("Tiền:", True, (0, 0, 0)), (5, 0))
         screen.blit(self.text_font.render("$"+str(get_score()), True, (0, 150, 0)), (55, 0))
         screen.blit(self.text_font.render("Mục tiêu:", True, (0, 0, 0)), (5, 25))
