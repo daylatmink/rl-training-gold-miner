@@ -1,17 +1,17 @@
 {
-  "timestamp": "2025-11-06T18:39:28.131974",
+  "timestamp": "2025-11-07T12:22:14.112856",
   "total_episodes": 0,
-  "total_steps": 1107,
+  "total_steps": 360,
   "final_epsilon": 0.3,
   "episode_rewards": [],
   "episode_lengths": [],
   "hyperparameters": {
-    "gamma": 0.999,
+    "gamma": 0.99,
     "epsilon_start": 0.5,
     "epsilon_end": 0.01,
     "epsilon_decay": 0.9,
-    "batch_size": 128,
-    "target_update_freq": 1,
+    "batch_size": 32,
+    "target_update_freq": 500,
     "buffer_size": 50000
   }
 }

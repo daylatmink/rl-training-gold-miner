@@ -165,10 +165,11 @@ class DQNTrainer:
         
         # Từ đây trở đi là các trường hợp DÙng MODEL
         if training and random.random() < self.epsilon:
-            # Random exploration
-            act = self.env.action_space.sample()
+            # Random exploration với Bernoulli(0.1)
+            # P(action=1) = 0.1, P(action=0) = 0.9
+            act = 1 if random.random() < 1.0 / 120 else 0
             if act == 1:
-                self.log("Exploring...")
+                self.log(f"Exploring action {act}")
             return act, True
         else:
             # Greedy exploitation
