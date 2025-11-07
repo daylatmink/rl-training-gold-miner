@@ -415,7 +415,7 @@ class DQNTrainer:
             
             # Save checkpoint
             if episode % save_freq == 0:
-                checkpoint_path = os.path.join(save_dir, f'checkpoint.pt')
+                checkpoint_path = os.path.join(save_dir, f'checkpoint_step{episode}.pt')
                 self.save_checkpoint(checkpoint_path)
                 self.log(f"Saved checkpoint: {checkpoint_path}")
         

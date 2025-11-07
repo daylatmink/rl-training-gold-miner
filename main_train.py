@@ -18,9 +18,9 @@ def main_train(headless: bool = False, checkpoint: str = None):
     """
     # Hyperparameters
     config = {
-        'num_episodes': 100,
+        'num_episodes': 20,
         'lr': 3e-4,
-        'gamma': 0.99,
+        'gamma': 1,
         'epsilon_start': 0.8,    # Tăng exploration ban đầu để học cả 2 actions
         'epsilon_end': 0.01,     # Giữ một chút exploration
         'epsilon_decay': 0.99,  # Decay chậm hơn: 0.3 -> 0.01 trong ~500 episodes
@@ -50,7 +50,7 @@ def main_train(headless: bool = False, checkpoint: str = None):
     print(f"  Render mode: {render_mode} ({'with display' if not headless else 'headless - no window'})")
     env = GoldMinerEnv(
         render_mode=render_mode,  # None = headless (không mở cửa sổ), 'human' = hiển thị
-        max_steps=3600 * 5,    # 60 giây * 60 FPS
+        max_steps=3600 * 3,    # 60 giây * 60 FPS
         level=0,           # level=0 → difficulty "train"
         use_generated_levels=True,
         c_dyna=10,       # Cost của dynamite
