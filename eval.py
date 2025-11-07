@@ -29,7 +29,7 @@ def evaluate_agent(checkpoint_path: str, num_episodes: int = 5, fps: int = 60):
     env = GoldMinerEnv(
         render_mode='human',  # Hiển thị game
         max_steps=3600,       # 60 giây * 60 FPS
-        level=1,
+        level=0,
         use_generated_levels=True,
         c_dyna=10,
         c_step=0.0,

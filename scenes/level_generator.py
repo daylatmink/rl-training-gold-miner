@@ -18,10 +18,27 @@ class LevelGenerator:
                     "NormalRock": {"weight": 0.3, "min": 2, "max": 5},   # Tăng từ 1-3 lên 2-5
                     "BigRock": {"weight": 0.0, "min": 0, "max": 0},
                     "MiniGold": {"weight": 0.8, "min": 8, "max": 14},    # Tăng từ 6-10 lên 8-14
-                    "NormalGold": {"weight": 0.6, "min": 5, "max": 9},   # Tăng từ 3-6 lên 5-9
-                    "BigGold": {"weight": 0.5, "min": 3, "max": 5},      # Tăng từ 2-3 lên 3-5
+                    "NormalGold": {"weight": 0.8, "min": 5, "max": 9},   # Tăng từ 3-6 lên 5-9
+                    "BigGold": {"weight": 0.8, "min": 3, "max": 6},      # Tăng từ 2-3 lên 3-5
                     "Diamond": {"weight": 0.0, "min": 0, "max": 0},
                     "QuestionBag": {"weight": 0.2, "min": 0, "max": 3},  # Tăng từ 0-2 lên 0-3
+                    "Mole": {"weight": 0.0, "min": 0, "max": 0},
+                    "MoleWithDiamond": {"weight": 0.0, "min": 0, "max": 0},
+                    "TNT": {"weight": 0.0, "min": 0, "max": 0},
+                    "Skull": {"weight": 0.0, "min": 0, "max": 0},
+                    "Bone": {"weight": 0.0, "min": 0, "max": 0}
+                },
+                "train": {
+                    # 🎯 TRAIN: Môi trường training đơn giản - chỉ rock, gold, question bag
+                    # Mỗi loại có số lượng đồng đều 3-4, ưu tiên như nhau
+                    "MiniRock": {"weight": 0.5, "min": 3, "max": 4},
+                    "NormalRock": {"weight": 0.5, "min": 3, "max": 4},
+                    "BigRock": {"weight": 0.5, "min": 3, "max": 4},
+                    "MiniGold": {"weight": 0.5, "min": 3, "max": 4},
+                    "NormalGold": {"weight": 0.5, "min": 3, "max": 4},
+                    "BigGold": {"weight": 0.5, "min": 2, "max": 4},  # Tăng weight lên 0.5 để ưu tiên ngang nhau
+                    "Diamond": {"weight": 0.0, "min": 0, "max": 0},
+                    "QuestionBag": {"weight": 0.5, "min": 3, "max": 4},
                     "Mole": {"weight": 0.0, "min": 0, "max": 0},
                     "MoleWithDiamond": {"weight": 0.0, "min": 0, "max": 0},
                     "TNT": {"weight": 0.0, "min": 0, "max": 0},
@@ -32,11 +49,11 @@ class LevelGenerator:
                     # 🎯 MEDIUM: Nhiều vàng + đá, có đá to, đá dày tầng trên
                     "MiniRock": {"weight": 0.5, "min": 3, "max": 6},
                     "NormalRock": {"weight": 0.4, "min": 2, "max": 4},
-                    "BigRock": {"weight": 0.3, "min": 1, "max": 3},      # Có đá to
-                    "MiniGold": {"weight": 0.7, "min": 5, "max": 8},
-                    "NormalGold": {"weight": 0.5, "min": 3, "max": 6},
-                    "BigGold": {"weight": 0.4, "min": 1, "max": 2},
-                    "Diamond": {"weight": 0.0, "min": 0, "max": 0},      # VẪN không có diamond
+                    "BigRock": {"weight": 0.3, "min": 1, "max": 3},
+                    "MiniGold": {"weight": 0.6, "min": 4, "max": 7},     # Giảm MiniGold
+                    "NormalGold": {"weight": 0.5, "min": 3, "max": 5},   # Giảm NormalGold
+                    "BigGold": {"weight": 0.8, "min": 3, "max": 6},      # TĂNG BigGold: 1-2 → 3-6
+                    "Diamond": {"weight": 0.0, "min": 0, "max": 0},
                     "QuestionBag": {"weight": 0.3, "min": 1, "max": 3},
                     "Mole": {"weight": 0.0, "min": 0, "max": 0},
                     "MoleWithDiamond": {"weight": 0.0, "min": 0, "max": 0},
@@ -48,11 +65,11 @@ class LevelGenerator:
                     # 🎯 HARD: Xuất hiện kim cương (2-5), nhiều đá to
                     "MiniRock": {"weight": 0.3, "min": 2, "max": 4},
                     "NormalRock": {"weight": 0.4, "min": 2, "max": 5},
-                    "BigRock": {"weight": 0.5, "min": 2, "max": 4},      # Nhiều đá to
-                    "MiniGold": {"weight": 0.3, "min": 3, "max": 6},
+                    "BigRock": {"weight": 0.5, "min": 2, "max": 4},
+                    "MiniGold": {"weight": 0.3, "min": 2, "max": 4},     # Giảm MiniGold
                     "NormalGold": {"weight": 0.4, "min": 2, "max": 4},
-                    "BigGold": {"weight": 0.3, "min": 1, "max": 2},
-                    "Diamond": {"weight": 0.8, "min": 2, "max": 5},      # CÓ diamond (2-5)
+                    "BigGold": {"weight": 0.7, "min": 3, "max": 5},      # TĂNG BigGold: 1-2 → 3-5
+                    "Diamond": {"weight": 0.8, "min": 2, "max": 5},
                     "QuestionBag": {"weight": 0.2, "min": 1, "max": 2},
                     "Mole": {"weight": 0.0, "min": 0, "max": 0},
                     "MoleWithDiamond": {"weight": 0.0, "min": 0, "max": 0},
@@ -225,7 +242,8 @@ class LevelGenerator:
                 }
             },
             "difficulty_profiles": {
-                "easy": {"total_entities": (10, 15), "value_ratio": 0.8},      # Tăng từ 8-12 lên 15-22
+                "easy": {"total_entities": (15, 25), "value_ratio": 0.8},      # Tăng lên 25-35 để đủ chỗ cho tất cả items
+                "train": {"total_entities": (18, 25), "value_ratio": 0.7},     # Training: 18-25 items, cân bằng
                 "medium": {"total_entities": (18, 28), "value_ratio": 0.7},    # Tăng từ 10-15 lên 18-28
                 "hard": {"total_entities": (22, 32), "value_ratio": 0.6},      # Tăng từ 12-18 lên 22-32
                 "expert": {"total_entities": (25, 35), "value_ratio": 0.5}     # Tăng từ 15-20 lên 25-35
@@ -375,19 +393,28 @@ class LevelGenerator:
                 if entities_left > 0 and not available_types:
                     break
         
-        # ĐẢM BẢO MIN COUNT CHO CÁC ENTITY QUAN TRỌNG
+        # ĐẢM BẢO MIN COUNT CHO CÁC ENTITY QUAN TRỌNG - TRANSFER NHIỀU LẦN
         for entity_type in priority_order:
             min_count = entity_config[entity_type]["min"]
+            max_count = entity_config[entity_type]["max"]
             current_count = distribution.get(entity_type, 0)
             
-            if min_count > 0 and current_count < min_count:
+            # Transfer cho đến khi đạt min hoặc không còn cách nào
+            while min_count > 0 and current_count < min_count and current_count < max_count:
                 # Tìm entity nào có số lượng nhiều để giảm bớt
+                transferred = False
                 for reduce_type in priority_order:
                     if reduce_type != entity_type and distribution.get(reduce_type, 0) > entity_config[reduce_type]["min"]:
                         distribution[reduce_type] -= 1
-                        distribution[entity_type] = distribution.get(entity_type, 0) + 1
-                        print(f"   🎯 DEBUG: Transferred 1 from {reduce_type} to {entity_type} to meet min requirement")
+                        distribution[entity_type] = min(distribution.get(entity_type, 0) + 1, max_count)
+                        current_count = distribution[entity_type]
+                        print(f"   DEBUG: Transferred 1 from {reduce_type} to {entity_type} (now {current_count}/{min_count} min)")
+                        transferred = True
                         break
+                
+                # Nếu không transfer được thì dừng (tránh vòng lặp vô hạn)
+                if not transferred:
+                    break
         
         return distribution
     def _calculate_difficulty_weights(self, difficulty: str) -> str:
@@ -523,7 +550,7 @@ class ProceduralLevelManager:
                 difficulty = self.difficulty_progression[progression_index]
             
             # Đảm bảo difficulty hợp lệ
-            valid_difficulties = ["easy", "medium", "hard", "expert"]
+            valid_difficulties = ["easy", "medium", "hard", "expert", "train"]
             if difficulty not in valid_difficulties:
                 difficulty = "medium"
             

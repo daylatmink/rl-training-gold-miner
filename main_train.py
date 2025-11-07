@@ -18,16 +18,16 @@ def main_train(headless: bool = False, checkpoint: str = None):
     """
     # Hyperparameters
     config = {
-        'num_episodes': 1000,
+        'num_episodes': 100,
         'lr': 3e-4,
         'gamma': 0.99,
-        'epsilon_start': 0.3,    # Tăng exploration ban đầu để học cả 2 actions
+        'epsilon_start': 0.8,    # Tăng exploration ban đầu để học cả 2 actions
         'epsilon_end': 0.01,     # Giữ một chút exploration
-        'epsilon_decay': 0.9,  # Decay chậm hơn: 0.3 -> 0.01 trong ~500 episodes
+        'epsilon_decay': 0.99,  # Decay chậm hơn: 0.3 -> 0.01 trong ~500 episodes
         'buffer_size': 50000,
         'batch_size': 32,
-        'target_update_freq': 500,
-        'train_freq': 10,         # Train mỗi bao nhiêu steps
+        'target_update_freq': 100,
+        'train_freq': 1,         # Train mỗi bao nhiêu steps
         'num_planning': 1,       # Số lần quét buffer (planning) hoặc số batches (standard)
         'use_planning': False,    # True: planning approach, False: standard DQN
         'save_freq': 1,
@@ -51,11 +51,11 @@ def main_train(headless: bool = False, checkpoint: str = None):
     env = GoldMinerEnv(
         render_mode=render_mode,  # None = headless (không mở cửa sổ), 'human' = hiển thị
         max_steps=3600,    # 60 giây * 60 FPS
-        level=1,
+        level=0,           # level=0 → difficulty "train"
         use_generated_levels=True,
         c_dyna=10,       # Cost của dynamite
         c_step=0.0,        # Step cost (0 = không dùng)
-        c_pull=0.5,        # Penalty khi đang kéo (0 = không dùng)
+        c_pull=0.2,        # Penalty khi đang kéo (0 = không dùng)
         reward_scale=10000.0,  # Scale reward xuống 1000 lần
         game_speed=1       # Giữ 1x để physics chính xác, headless đã đủ nhanh
     )
