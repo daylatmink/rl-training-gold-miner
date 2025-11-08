@@ -1,10 +1,14 @@
 import torch
 import torch.nn as nn
 import math
+import numpy as np
 
 class Embedder(nn.Module):
     """
-    Embedder: Convert game state (dict) sang token embeddings [B, L, d_model].
+    Embedder: Convert preprocessed state tensors sang token embeddings [B, L, d_model].
+    
+    OPTIMIZED VERSION: State được preprocess thành [item_feats, type_ids] trước khi forward.
+    Forward chỉ cần: embedding[type_ids] + linear(item_feats) → Nhanh hơn nhiều!
     
     Token types:
     - ENV: Global + rope + miner state
@@ -76,8 +80,10 @@ class Embedder(nn.Module):
         nn.init.normal_(self.token_type_embed.weight, mean=0.0, std=0.02)
         nn.init.xavier_uniform_(self.env_proj.weight)
         nn.init.xavier_uniform_(self.item_proj.weight)
+        nn.init.xavier_uniform_(self.movement_proj.weight)
         nn.init.zeros_(self.env_proj.bias)
         nn.init.zeros_(self.item_proj.bias)
+        nn.init.zeros_(self.movement_proj.bias)
     
     def _normalize_env_features(self, state, device):
         """
@@ -216,9 +222,69 @@ class Embedder(nn.Module):
         
         return token_name
     
-    def forward(self, state):
+    def forward(self, type_ids, item_feats, mov_idx=None, mov_feats=None, mask=None):
         """
-        Convert state dict sang token embeddings.
+        OPTIMIZED: Convert preprocessed tensors sang token embeddings.
+        
+        Args:
+            type_ids: LongTensor [B, L] - Token type IDs (0-10)
+            item_feats: FloatTensor [B, L, 10] - Item features
+            mov_idx: LongTensor [B, l] - Indices của items có movement (optional)
+            mov_feats: FloatTensor [B, l, 3] - Movement features (dxl, dxr, direction) (optional)
+            mask: BoolTensor [B, L] - True cho padding positions (optional)
+        
+        Returns:
+            tokens: FloatTensor [B, L, d_model]
+            mask: BoolTensor [B, L] - True cho padding positions
+        """
+        device = item_feats.device
+        B, L = type_ids.shape
+        
+        # Lookup type embeddings: [B, L, d_model]
+        type_embeds = self.token_type_embed(type_ids)
+        
+        # Project item features: [B, L, d_model]
+        feat_embeds = self.item_proj(item_feats)
+        
+        # Add movement features if exists
+        if mov_idx is not None and mov_feats is not None:
+            # Project movement features: [B, l, d_model]
+            mov_embeds = self.movement_proj(mov_feats)
+            
+            # VECTORIZED: Add mov_embeds vào đúng vị trí trong feat_embeds
+            # Create batch indices: [B, l]
+            batch_indices = torch.arange(B, device=device).unsqueeze(1).expand_as(mov_idx)
+            
+            # Flatten indices for scatter_add: [B*l]
+            flat_batch_idx = batch_indices.reshape(-1)
+            flat_mov_idx = mov_idx.reshape(-1)
+            
+            # Filter out invalid indices (-1 padding)
+            valid_mask = flat_mov_idx >= 0
+            flat_batch_idx = flat_batch_idx[valid_mask]
+            flat_mov_idx = flat_mov_idx[valid_mask]
+            flat_mov_embeds = mov_embeds.reshape(-1, self.d_model)[valid_mask]
+            
+            # Scatter add: feat_embeds[batch_idx, mov_idx] += mov_embeds
+            # Reshape feat_embeds to [B*L, d_model] for easier indexing
+            feat_embeds_flat = feat_embeds.view(-1, self.d_model)
+            linear_indices = flat_batch_idx * L + flat_mov_idx
+            feat_embeds_flat.index_add_(0, linear_indices, flat_mov_embeds)
+            feat_embeds = feat_embeds_flat.view(B, L, self.d_model)
+        
+        # Combine: feat_embeds + type_embeds
+        tokens = self.layer_norm(self.dropout(feat_embeds + type_embeds))
+        
+        # Create mask if not provided
+        if mask is None:
+            # Assume PAD type_id = 10
+            mask = (type_ids == self.TOKEN_TYPES['PAD'])
+        
+        return tokens, mask
+    
+    def forward_legacy(self, state):
+        """
+        LEGACY: Convert state dict sang token embeddings (cho backward compatibility).
         
         Args:
             state: Dict từ get_game_state() hoặc json_to_state()
@@ -283,3 +349,134 @@ class Embedder(nn.Module):
         if not is_batch:
             return tokens.squeeze(0), mask.squeeze(0)  # [L, d_model], [L]
         return tokens, mask  # [B, L, d_model], [B, L]
+    
+    @staticmethod
+    def preprocess_state(state, max_items=30):
+        """
+        STATIC METHOD: Preprocess state dict thành 4 tensors.
+        
+        Returns 4 arrays:
+        - type_ids [L]: Token type IDs
+        - item_feats [L, 10]: Item features (tất cả items đều 10 features)
+        - mov_idx [l]: Indices của items có movement
+        - mov_feats [l, 3]: Movement features chỉ cho items có movement
+        
+        Args:
+            state: Dict từ get_game_state()
+            max_items: Max number of items
+        
+        Returns:
+            type_ids: np.ndarray [L] - Token type IDs (int64)
+            item_feats: np.ndarray [L, 10] - Item features (float32)
+            mov_idx: np.ndarray [l] - Indices của items có movement (int64)
+            mov_feats: np.ndarray [l, 3] - Movement features (float32)
+        """
+        feats_list = []
+        type_ids_list = []
+        mov_idx_list = []
+        mov_feats_list = []
+        
+        global_state = state['global_state']
+        rope_state = state['rope_state']
+        
+        # 1. ENV token
+        rope_state_map = {'swinging': 0, 'expanding': 1, 'retracting': 2}
+        rope_state_id = rope_state_map.get(rope_state['state'], 0)
+        rope_angle_rad = math.radians(rope_state['direction'])
+        rope_sin = math.sin(rope_angle_rad)
+        rope_cos = math.cos(rope_angle_rad)
+        
+        env_feats = [
+            (global_state['time_left'] - Embedder.HALF_TIME) / Embedder.HALF_TIME,
+            (global_state['dynamite_count'] - Embedder.HALF_DYNAMITE) / Embedder.HALF_DYNAMITE,
+            rope_sin,
+            rope_cos,
+            (rope_state['length'] - Embedder.HALF_ROPE_LENGTH) / Embedder.HALF_ROPE_LENGTH,
+            (rope_state['weight'] - Embedder.HALF_ROPE_WEIGHT) / Embedder.HALF_ROPE_WEIGHT,
+            1.0 if rope_state['has_item'] else 0.0,
+            1.0 if rope_state_id == 0 else 0.0,
+            1.0 if rope_state_id == 1 else 0.0,
+            1.0 if rope_state_id == 2 else 0.0,
+        ]
+        feats_list.append(env_feats)
+        type_ids_list.append(Embedder.TOKEN_TYPES['ENV'])
+        
+        # 2. Item tokens
+        rope_x = rope_state['end_position']['x']
+        rope_y = rope_state['end_position']['y']
+        
+        for idx, item in enumerate(state['items'][:max_items]):
+            # Calculate relative position
+            dx = item['position']['x'] - rope_x
+            dy = item['position']['y'] - rope_y
+            r = math.sqrt(dx*dx + dy*dy)
+            phi = math.atan2(dy, dx)
+            sin_phi = math.sin(phi)
+            cos_phi = math.cos(phi)
+            
+            # Calculate weight and pulling time
+            weight = item['size'] / 30.0
+            rope_speed = rope_state['speed']
+            buff_speed = rope_state['buff_speed']
+            
+            if weight > 0:
+                speed_retracting = (rope_speed * buff_speed) / weight
+                pull_time = r / speed_retracting
+            else:
+                pull_time = 0.0
+            
+            # Normalize
+            dx_norm = dx / Embedder.HALF_SCREEN_WIDTH
+            dy_norm = (dy - Embedder.HALF_SCREEN_HEIGHT) / Embedder.HALF_SCREEN_HEIGHT
+            r_norm = (r - Embedder.HALF_DIAGONAL) / Embedder.HALF_DIAGONAL
+            weight_norm = (weight - Embedder.HALF_ROPE_WEIGHT) / Embedder.HALF_ROPE_WEIGHT
+            pull_time_norm = (pull_time - Embedder.HALF_PULL_TIME) / Embedder.HALF_PULL_TIME
+            
+            item_feats = [
+                dx_norm,
+                dy_norm,
+                r_norm,
+                sin_phi,
+                cos_phi,
+                (item['size'] - Embedder.HALF_SIZE) / Embedder.HALF_SIZE,
+                (item['point'] - Embedder.HALF_POINT) / Embedder.HALF_POINT,
+                weight_norm,
+                pull_time_norm,
+                1.0 if item['is_move'] else 0.0,
+            ]
+            
+            feats_list.append(item_feats)
+            
+            # Get type_id
+            if 'subtype' in item:
+                token_name = item['subtype']
+            else:
+                token_name = item['type']
+            if token_name not in Embedder.TOKEN_TYPES:
+                token_name = 'PAD'
+            type_ids_list.append(Embedder.TOKEN_TYPES[token_name])
+            
+            # Check for movement features
+            if 'ranges' in item and item['ranges'] is not None:
+                dxl, dxr = item['ranges']
+                dxl_rel = dxl - rope_x
+                dxr_rel = dxr - rope_x
+                dxl_norm = dxl_rel / Embedder.HALF_SCREEN_WIDTH
+                dxr_norm = dxr_rel / Embedder.HALF_SCREEN_WIDTH
+                
+                mov_idx_list.append(idx + 1)  # +1 vì ENV token ở index 0
+                mov_feats_list.append([dxl_norm, dxr_norm, float(item['direction'])])
+        
+        # Convert to numpy arrays
+        type_ids = np.array(type_ids_list, dtype=np.int64)
+        item_feats = np.array(feats_list, dtype=np.float32)
+        
+        if len(mov_idx_list) > 0:
+            mov_idx = np.array(mov_idx_list, dtype=np.int64)
+            mov_feats = np.array(mov_feats_list, dtype=np.float32)
+        else:
+            # Empty arrays
+            mov_idx = np.array([], dtype=np.int64)
+            mov_feats = np.array([], dtype=np.float32).reshape(0, 3)
+        
+        return type_ids, item_feats, mov_idx, mov_feats

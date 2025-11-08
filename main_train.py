@@ -18,17 +18,17 @@ def main_train(headless: bool = False, checkpoint: str = None):
     """
     # Hyperparameters
     config = {
-        'num_episodes': 20,
+        'num_episodes': 200,
         'lr': 3e-4,
         'gamma': 1,
         'epsilon_start': 0.8,    # Tăng exploration ban đầu để học cả 2 actions
         'epsilon_end': 0.01,     # Giữ một chút exploration
         'epsilon_decay': 0.99,  # Decay chậm hơn: 0.3 -> 0.01 trong ~500 episodes
         'buffer_size': 50000,
-        'batch_size': 32,
-        'target_update_freq': 100,
+        'batch_size': 128,
+        'target_update_freq': 200,
         'train_freq': 1,         # Train mỗi bao nhiêu steps
-        'num_planning': 1,       # Số lần quét buffer (planning) hoặc số batches (standard)
+        'num_planning': 3,       # Số lần quét buffer (planning) hoặc số batches (standard)
         'use_planning': False,    # True: planning approach, False: standard DQN
         'save_freq': 1,
         'eval_freq': 200,
@@ -50,13 +50,13 @@ def main_train(headless: bool = False, checkpoint: str = None):
     print(f"  Render mode: {render_mode} ({'with display' if not headless else 'headless - no window'})")
     env = GoldMinerEnv(
         render_mode=render_mode,  # None = headless (không mở cửa sổ), 'human' = hiển thị
-        max_steps=3600 * 3,    # 60 giây * 60 FPS
+        max_steps=3600 * 2,    # 60 giây * 60 FPS
         level=0,           # level=0 → difficulty "train"
         use_generated_levels=True,
         c_dyna=10,       # Cost của dynamite
         c_step=0.0,        # Step cost (0 = không dùng)
         c_pull=0.2,        # Penalty khi đang kéo (0 = không dùng)
-        reward_scale=10000.0,  # Scale reward xuống 1000 lần
+        reward_scale=1000.0,  # Scale reward xuống 1000 lần
         game_speed=1       # Giữ 1x để physics chính xác, headless đã đủ nhanh
     )
     print("✓ Environment created")
@@ -147,4 +147,4 @@ if __name__ == '__main__':
     
     # Nếu dùng --show thì headless=False (hiển thị), ngược lại headless=True (không hiển thị)
     main_train(headless=not args.show, checkpoint=args.checkpoint)
-    # main_train(headless=False, checkpoint='C:\\Users\\User\\Documents\\code\\rl-training-gold-miner\\checkpoints\\checkpoint_copy.pt')
+    # main_train(headless=False)

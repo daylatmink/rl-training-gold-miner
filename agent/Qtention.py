@@ -62,17 +62,21 @@ class Qtention(nn.Module):
             self.act_emb.data[0] += torch.randn(d_model) * 0.01
             self.act_emb.data[1] += torch.randn(d_model) * 0.01
 
-    def forward(self, x_state):
+    def forward(self, type_ids, item_feats, mov_idx=None, mov_feats=None, mask=None):
         """
-        x_state: State dict hoặc list of state dicts
-        return: Q logits, shape [B, n_actions] hoặc [n_actions] nếu single state.
-        """
-        # Check if single state or batch
-        is_single = not isinstance(x_state, list)
-        if is_single:
-            x_state = [x_state]  # Convert to batch of 1
+        Forward với preprocessed tensors.
         
-        x_tokens, mask = self.embedder(x_state)  # [B, L, d], [B, L]
+        Args:
+            type_ids: LongTensor [B, L] - Token type IDs
+            item_feats: FloatTensor [B, L, 10] - Item features
+            mov_idx: LongTensor [B, l] - Movement indices (optional)
+            mov_feats: FloatTensor [B, l, 3] - Movement features (optional)
+            mask: BoolTensor [B, L] - Padding mask (optional)
+        
+        Returns:
+            Q logits, shape [B, n_actions]
+        """
+        x_tokens, mask = self.embedder(type_ids, item_feats, mov_idx, mov_feats, mask)  # [B, L, d], [B, L]
         B = x_tokens.size(0)
         act = self.act_emb.unsqueeze(0).expand(B, -1, -1)   # [B, n_actions, d]
         x = torch.cat([x_tokens, act], dim=1)               # [B, L+n_actions, d]
@@ -90,6 +94,4 @@ class Qtention(nn.Module):
         # Compute Q values
         Q = self.head(h_actions).squeeze(-1)                # [B, n_actions]
         
-        if is_single:
-            return Q.squeeze(0)  # [n_actions] for single state
         return Q
