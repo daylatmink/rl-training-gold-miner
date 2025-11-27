@@ -13,32 +13,15 @@ class LevelGenerator:
             # 🎯 CONFIG THEO TỪNG DIFFICULTY - HOÀN TOÀN RIÊNG BIỆT
             "entity_types_by_difficulty": {
                 "easy": {
-                    # 🎯 EASY: Chỉ vàng + đá + ít túi, không có vật phẩm đặc biệt
-                    "MiniRock": {"weight": 0.4, "min": 3, "max": 7},     # Tăng từ 2-5 lên 3-7
-                    "NormalRock": {"weight": 0.3, "min": 2, "max": 5},   # Tăng từ 1-3 lên 2-5
+                    # 🎯 EASY: Mức độ vừa phải để học - chỉ vàng + đá cơ bản
+                    "MiniRock": {"weight": 0.4, "min": 2, "max": 4},     # Tăng lên 2-4
+                    "NormalRock": {"weight": 0.3, "min": 1, "max": 3},   # Tăng lên 1-3
                     "BigRock": {"weight": 0.0, "min": 0, "max": 0},
-                    "MiniGold": {"weight": 0.8, "min": 8, "max": 14},    # Tăng từ 6-10 lên 8-14
-                    "NormalGold": {"weight": 0.8, "min": 5, "max": 9},   # Tăng từ 3-6 lên 5-9
-                    "BigGold": {"weight": 0.8, "min": 3, "max": 6},      # Tăng từ 2-3 lên 3-5
+                    "MiniGold": {"weight": 0.8, "min": 4, "max": 7},     # Tăng lên 4-7
+                    "NormalGold": {"weight": 0.8, "min": 3, "max": 5},   # Tăng lên 3-5
+                    "BigGold": {"weight": 0.8, "min": 2, "max": 4},      # Tăng lên 2-4
                     "Diamond": {"weight": 0.0, "min": 0, "max": 0},
-                    "QuestionBag": {"weight": 0.2, "min": 0, "max": 3},  # Tăng từ 0-2 lên 0-3
-                    "Mole": {"weight": 0.0, "min": 0, "max": 0},
-                    "MoleWithDiamond": {"weight": 0.0, "min": 0, "max": 0},
-                    "TNT": {"weight": 0.0, "min": 0, "max": 0},
-                    "Skull": {"weight": 0.0, "min": 0, "max": 0},
-                    "Bone": {"weight": 0.0, "min": 0, "max": 0}
-                },
-                "train": {
-                    # 🎯 TRAIN: Môi trường training đơn giản - chỉ rock, gold, question bag
-                    # Mỗi loại có số lượng đồng đều 3-4, ưu tiên như nhau
-                    "MiniRock": {"weight": 0.5, "min": 3, "max": 4},
-                    "NormalRock": {"weight": 0.5, "min": 3, "max": 4},
-                    "BigRock": {"weight": 0.5, "min": 3, "max": 4},
-                    "MiniGold": {"weight": 0.5, "min": 3, "max": 4},
-                    "NormalGold": {"weight": 0.5, "min": 3, "max": 4},
-                    "BigGold": {"weight": 0.5, "min": 2, "max": 4},  # Tăng weight lên 0.5 để ưu tiên ngang nhau
-                    "Diamond": {"weight": 0.0, "min": 0, "max": 0},
-                    "QuestionBag": {"weight": 0.5, "min": 3, "max": 4},
+                    "QuestionBag": {"weight": 0.2, "min": 0, "max": 2},  # Tăng lên 0-2
                     "Mole": {"weight": 0.0, "min": 0, "max": 0},
                     "MoleWithDiamond": {"weight": 0.0, "min": 0, "max": 0},
                     "TNT": {"weight": 0.0, "min": 0, "max": 0},
@@ -242,11 +225,10 @@ class LevelGenerator:
                 }
             },
             "difficulty_profiles": {
-                "easy": {"total_entities": (15, 25), "value_ratio": 0.8},      # Tăng lên 25-35 để đủ chỗ cho tất cả items
-                "train": {"total_entities": (18, 25), "value_ratio": 0.7},     # Training: 18-25 items, cân bằng
-                "medium": {"total_entities": (18, 28), "value_ratio": 0.7},    # Tăng từ 10-15 lên 18-28
-                "hard": {"total_entities": (22, 32), "value_ratio": 0.6},      # Tăng từ 12-18 lên 22-32
-                "expert": {"total_entities": (25, 35), "value_ratio": 0.5}     # Tăng từ 15-20 lên 25-35
+                "easy": {"total_entities": (8, 12), "value_ratio": 0.8},       # Giảm xuống: 8-12 items
+                "medium": {"total_entities": (12, 18), "value_ratio": 0.7},    # Giảm xuống: 12-18 items
+                "hard": {"total_entities": (15, 22), "value_ratio": 0.6},      # Giảm xuống: 15-22 items
+                "expert": {"total_entities": (18, 25), "value_ratio": 0.5}     # Giảm xuống: 18-25 items
             }
         }
     def generate_level(self, level_id: str, difficulty: str = "medium") -> Dict:
@@ -550,7 +532,7 @@ class ProceduralLevelManager:
                 difficulty = self.difficulty_progression[progression_index]
             
             # Đảm bảo difficulty hợp lệ
-            valid_difficulties = ["easy", "medium", "hard", "expert", "train"]
+            valid_difficulties = ["easy", "medium", "hard", "expert"]
             if difficulty not in valid_difficulties:
                 difficulty = "medium"
             

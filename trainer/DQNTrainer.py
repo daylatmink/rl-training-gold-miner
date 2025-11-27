@@ -20,6 +20,39 @@ from model.GoldMiner import GoldMinerEnv
 from agent.Qtention import Qtention
 from agent.Embedder import Embedder
 
+# 30 actions - chia đều góc 15-165° thành 30 khoảng (5° mỗi khoảng)
+angle_bins = [
+    (15.0, 20.0),    # Action 0
+    (20.0, 25.0),    # Action 1
+    (25.0, 30.0),    # Action 2
+    (30.0, 35.0),    # Action 3
+    (35.0, 40.0),    # Action 4
+    (40.0, 45.0),    # Action 5
+    (45.0, 50.0),    # Action 6
+    (50.0, 55.0),    # Action 7
+    (55.0, 60.0),    # Action 8
+    (60.0, 65.0),    # Action 9
+    (65.0, 70.0),    # Action 10
+    (70.0, 75.0),    # Action 11
+    (75.0, 80.0),    # Action 12
+    (80.0, 85.0),    # Action 13
+    (85.0, 90.0),    # Action 14
+    (90.0, 95.0),    # Action 15
+    (95.0, 100.0),   # Action 16
+    (100.0, 105.0),  # Action 17
+    (105.0, 110.0),  # Action 18
+    (110.0, 115.0),  # Action 19
+    (115.0, 120.0),  # Action 20
+    (120.0, 125.0),  # Action 21
+    (125.0, 130.0),  # Action 22
+    (130.0, 135.0),  # Action 23
+    (135.0, 140.0),  # Action 24
+    (140.0, 145.0),  # Action 25
+    (145.0, 150.0),  # Action 26
+    (150.0, 155.0),  # Action 27
+    (155.0, 160.0),  # Action 28
+    (160.0, 165.0)   # Action 29
+]
 
 class ReplayBuffer:
     """
@@ -35,29 +68,25 @@ class ReplayBuffer:
     def __init__(self, capacity: int = 5000):
         self.buffer: Deque = deque(maxlen=capacity)
     
-    def push(self, type_ids: np.ndarray, item_feats: np.ndarray, mov_idx: np.ndarray, mov_feats: np.ndarray,
+    def push(self, type_ids: torch.Tensor, item_feats: torch.Tensor, mov_idx: torch.Tensor, mov_feats: torch.Tensor,
              action: int, reward: float, 
-             next_type_ids: np.ndarray, next_item_feats: np.ndarray, next_mov_idx: np.ndarray, next_mov_feats: np.ndarray,
+             next_type_ids: torch.Tensor, next_item_feats: torch.Tensor, next_mov_idx: torch.Tensor, next_mov_feats: torch.Tensor,
              done: bool):
         """
         Thêm transition vào buffer.
-        Convert numpy arrays → torch tensors (CPU) để tránh phải convert lại khi training.
+        Nhận torch tensors (CPU) - đã được preprocess sẵn.
         """
-        # Convert numpy → torch tensors (CPU)
-        type_ids_t = torch.from_numpy(type_ids)
-        item_feats_t = torch.from_numpy(item_feats)
-        mov_idx_t = torch.from_numpy(mov_idx) if len(mov_idx) > 0 else torch.empty(0, dtype=torch.long)
-        mov_feats_t = torch.from_numpy(mov_feats) if len(mov_feats) > 0 else torch.empty(0, 3, dtype=torch.float32)
+        # Đảm bảo mov tensors có shape đúng nếu empty
+        mov_idx_t = mov_idx if len(mov_idx) > 0 else torch.empty(0, dtype=torch.long)
+        mov_feats_t = mov_feats if len(mov_feats) > 0 else torch.empty(0, 3, dtype=torch.float32)
         
-        next_type_ids_t = torch.from_numpy(next_type_ids)
-        next_item_feats_t = torch.from_numpy(next_item_feats)
-        next_mov_idx_t = torch.from_numpy(next_mov_idx) if len(next_mov_idx) > 0 else torch.empty(0, dtype=torch.long)
-        next_mov_feats_t = torch.from_numpy(next_mov_feats) if len(next_mov_feats) > 0 else torch.empty(0, 3, dtype=torch.float32)
+        next_mov_idx_t = next_mov_idx if len(next_mov_idx) > 0 else torch.empty(0, dtype=torch.long)
+        next_mov_feats_t = next_mov_feats if len(next_mov_feats) > 0 else torch.empty(0, 3, dtype=torch.float32)
         
         self.buffer.append((
-            type_ids_t, item_feats_t, mov_idx_t, mov_feats_t,
+            type_ids, item_feats, mov_idx_t, mov_feats_t,
             action, reward,
-            next_type_ids_t, next_item_feats_t, next_mov_idx_t, next_mov_feats_t,
+            next_type_ids, next_item_feats, next_mov_idx_t, next_mov_feats_t,
             done
         ))
     
@@ -232,7 +261,7 @@ class DQNTrainer:
         epsilon_start: float = 0.5,  # Thấp hơn vì chỉ có 2 actions
         epsilon_end: float = 0.01,    # End sớm hơn
         epsilon_decay: float = 0.99,  # Decay nhanh hơn, replay buffer đã giúp break correlation
-        buffer_size: int = 50000,
+        buffer_size: int = 320,
         batch_size: int = 64,
         target_update_freq: int = 1000,
         train_freq: int = 1,  # Tần suất training: train mỗi train_freq steps
@@ -324,51 +353,32 @@ class DQNTrainer:
         Returns:
             (action, used_model): action được chọn và flag cho biết có dùng model không
         """
-        # Check rope state để xác định forced actions
-        rope_state = state['rope_state']
-        is_retracting_with_item = (rope_state['state'] == 'retracting')
-        is_expanding = (rope_state['state'] == 'expanding')
-        is_swinging = (rope_state['state'] == 'swinging')
-        has_dynamite = state['global_state']['dynamite_count'] > 0
-        has_item = rope_state['has_item']
-        rope_timer = rope_state.get('timer', -1)
+        # Preprocess state
+        type_ids, item_feats, mov_idx, mov_feats = Embedder.preprocess_state(state)
         
-        # AUTO ACTION 1: Nếu đang kéo mà không có dynamite → chỉ có action 0 (do nothing)
-        if is_retracting_with_item and (not has_dynamite or not has_item):
-            return 0, False  # Do nothing (không dùng model)
+        # Convert to torch tensors và chuyển sang device
+        type_ids_t =type_ids.unsqueeze(0).to(self.device)  # [1, L]
+        item_feats_t =item_feats.unsqueeze(0).to(self.device)  # [1, L, d_feats]
+        mov_idx_t =mov_idx.unsqueeze(0).to(self.device) if len(mov_idx) > 0 else None
+        mov_feats_t =mov_feats.unsqueeze(0).to(self.device) if len(mov_feats) > 0 else None
         
-        # AUTO ACTION 2: Nếu móc đang được thả xuống (expanding) → chỉ có action 0 (do nothing)
-        if is_expanding:
-            return 0, False  # Do nothing (không dùng model)
-        
-        # AUTO ACTION 3: Nếu móc đang swinging nhưng timer > 0 (cooldown) → chỉ có action 0
-        if is_swinging and rope_timer > 0:
-            return 0, False  # Do nothing (không dùng model - đang cooldown)
-        
-        # Từ đây trở đi là các trường hợp DÙNG MODEL
+        # Epsilon-greedy action selection
         if training and random.random() < self.epsilon:
-            # Random exploration với Bernoulli(0.1)
-            # P(action=1) = 0.1, P(action=0) = 0.9
-            act = 1 if random.random() < 1.0 / 60 else 0
-            if act == 1:
-                self.log(f"Exploring action {act}")
-            return act, True
+            action = random.randint(0, self.agent.n_actions - 1)
+            used_model = False
+            q_value = None
         else:
-            # Greedy exploitation - preprocess state trước
-            type_ids, item_feats, mov_idx, mov_feats = Embedder.preprocess_state(state)
-            
-            # Convert to tensors và add batch dimension
-            type_ids_t = torch.from_numpy(type_ids).unsqueeze(0).to(self.device)
-            item_feats_t = torch.from_numpy(item_feats).unsqueeze(0).to(self.device)
-            mov_idx_t = torch.from_numpy(mov_idx).unsqueeze(0).to(self.device)
-            mov_feats_t = torch.from_numpy(mov_feats).unsqueeze(0).to(self.device)
-            
             with torch.no_grad():
                 q_values = self.agent(type_ids_t, item_feats_t, mov_idx_t, mov_feats_t)  # [1, n_actions]
-                q_values = q_values.squeeze(0)  # [n_actions]
-                if q_values[1] > q_values[0]:
-                    self.log(f"Exploiting {q_values[0]}, {q_values[1]}")
-                return q_values.argmax().item(), True
+                action = q_values.argmax(dim=1).item()
+                q_value = q_values[0][action].cpu().item()
+            used_model = True
+        
+        # Lưu thông tin action vào global state để hiển thị trên màn hình
+        from define import set_ai_action_info
+        set_ai_action_info(action, q_value, used_model)
+        
+        return action, used_model
     
     def train_step(self, cur_step) -> list:
         """
@@ -450,8 +460,8 @@ class DQNTrainer:
             losses.append(loss)
             
             # Log loss cho mỗi batch
-            if cur_step % 600 == 0:
-                self.log(f"Step {cur_step % 3600}/3600  Batch {batch_idx+1}/{self.num_planning} - Loss: {loss:.8f} - Buffer: {len(self.replay_buffer)}")
+            if cur_step % 6 == 0:
+                self.log(f"Step {cur_step}  Batch {batch_idx+1}/{self.num_planning} - Loss: {loss:.8f} - Buffer: {len(self.replay_buffer)}")
         
         return losses
     
@@ -513,47 +523,66 @@ class DQNTrainer:
         state, _ = self.env.reset()
         episode_reward = 0.0
         episode_steps = 0
+        current_reward = 0
+        action_buffer = None
+        state_buffer = None
+        new_state_buffer = None
+        reward_buffer = 0
+        angle_decision = None
+        done = False
         
-        while True:
-            # Select action - trả về (action, used_model)
-            action, used_model = self.select_action(state, training=True)
+        def update_replay_buffer():
+            nonlocal action_buffer, reward_buffer, episode_reward, episode_steps
             
-            # Take action
-            next_state, reward, terminated, truncated, info = self.env.step(action)
-            done = terminated or truncated
-            
-            # Preprocess states trước khi push vào buffer
-            type_ids, item_feats, mov_idx, mov_feats = Embedder.preprocess_state(state)
-            next_type_ids, next_item_feats, next_mov_idx, next_mov_feats = Embedder.preprocess_state(next_state)
-            
+            old_type_ids, old_item_feats, old_mov_idx, old_mov_feats = state_buffer
+            new_type_ids, new_item_feats, new_mov_idx, new_mov_feats = Embedder.preprocess_state(state)
             self.replay_buffer.push(
-                type_ids, item_feats, mov_idx, mov_feats,
-                action, reward,
-                next_type_ids, next_item_feats, next_mov_idx, next_mov_feats,
+                old_type_ids, old_item_feats, old_mov_idx, old_mov_feats,
+                action_buffer, reward_buffer,
+                new_type_ids, new_item_feats, new_mov_idx, new_mov_feats,
                 done
             )
             
-            # Train CHỈ KHI đạt train_freq
-            
-            # Update target network
             self.total_steps += 1
             if self.total_steps % self.target_update_freq == 0:
                 self.update_target_network()
-
             if self.total_steps % self.train_freq == 0:
-                if self.total_steps % 600 == 0:
-                    self.log(f"Episode step {episode_steps} reward: {episode_reward}")
+                self.log(f"Episode step {episode_steps} reward: {episode_reward}")
                 losses = self.train_step(self.total_steps)
                 if losses:  # Nếu có loss (buffer đủ lớn)
                     self.losses.extend(losses)  # Thêm tất cả losses vào list
-            
-            # Update state
-            state = next_state
-            episode_reward += reward
+                    
+            episode_reward += reward_buffer
             episode_steps += 1
             
-            if done:
-                break
+            reward_buffer = 0
+            action_buffer = None
+            
+            return new_type_ids, new_item_feats, new_mov_idx, new_mov_feats
+        
+        while True:
+            if not done and (state['rope_state']['state'] in ['expanding', 'retracting'] or state['rope_state']['timer'] > 0):
+                next_state, reward, terminated, truncated, info = self.env.step(0)  # No-op action
+            else:
+                if angle_decision is None or done:
+                    if state_buffer is not None:     
+                        new_state_buffer = update_replay_buffer()
+                    if done:
+                        break
+                    action_buffer, used_model = self.select_action(state, training=True)
+                    angle_decision = angle_bins[action_buffer]
+                    state_buffer = new_state_buffer if state_buffer is not None else Embedder.preprocess_state(state)
+                
+                current_angle = state['rope_state']['direction']
+                if angle_decision is not None and angle_decision[0] <= current_angle and current_angle < angle_decision[1]:
+                    next_state, reward, terminated, truncated, info = self.env.step(1)  # Fire action
+                    angle_decision = None
+                else:
+                    next_state, reward, terminated, truncated, info = self.env.step(0)  # No-op action
+    
+            done = terminated or truncated
+            reward_buffer += reward
+            state = next_state
         
         # Decay epsilon
         self.epsilon = max(self.epsilon_end, self.epsilon * self.epsilon_decay)
@@ -641,7 +670,7 @@ class DQNTrainer:
     
     def evaluate(self, num_episodes: int = 5) -> float:
         """
-        Evaluate agent với greedy policy
+        Evaluate agent với greedy policy - logic giống train_episode
         
         Args:
             num_episodes: Số episodes để evaluate
@@ -655,15 +684,37 @@ class DQNTrainer:
         for _ in range(num_episodes):
             state, _ = self.env.reset()
             episode_reward = 0.0
+            episode_steps = 0
+            action_buffer = None
+            reward_buffer = 0
+            angle_decision = None
+            done = False
             
             while True:
-                action, _ = self.select_action(state, training=False)  # Bỏ qua used_model flag
-                next_state, reward, terminated, truncated, _ = self.env.step(action)
-                episode_reward += reward
+                if not done and (state['rope_state']['state'] in ['expanding', 'retracting'] or state['rope_state']['timer'] > 0):
+                    next_state, reward, terminated, truncated, info = self.env.step(0)  # No-op action
+                else:
+                    if angle_decision is None or done:
+                        if action_buffer is not None:
+                            episode_reward += reward_buffer
+                            episode_steps += 1
+                            reward_buffer = 0
+                            action_buffer = None
+                        if done:
+                            break
+                        action_buffer, used_model = self.select_action(state, training=False)  # Greedy
+                        angle_decision = angle_bins[action_buffer]
+                    
+                    current_angle = state['rope_state']['direction']
+                    if angle_decision is not None and angle_decision[0] <= current_angle and current_angle < angle_decision[1]:
+                        next_state, reward, terminated, truncated, info = self.env.step(1)  # Fire action
+                        angle_decision = None
+                    else:
+                        next_state, reward, terminated, truncated, info = self.env.step(0)  # No-op action
+        
+                done = terminated or truncated
+                reward_buffer += reward
                 state = next_state
-                
-                if terminated or truncated:
-                    break
             
             eval_rewards.append(episode_reward)
         

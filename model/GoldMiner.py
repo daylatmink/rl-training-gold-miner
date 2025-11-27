@@ -237,6 +237,12 @@ class GoldMinerEnv(gym.Env):
             terminated = True
             self.done = True
         
+        # AUTO TERMINATE: Khi kéo hết item VÀ móc đã về (swinging)
+        # Chỉ terminate khi: (1) không còn item, (2) móc đang rảnh (swinging)
+        if len(self.game_scene.items) == 0 and rope.state == 'swinging':
+            terminated = True
+            self.done = True
+        
         # Truncation: quá max_steps
         self.steps += 1
         if self.steps >= self.max_steps:

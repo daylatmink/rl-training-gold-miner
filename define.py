@@ -266,6 +266,24 @@ def use_dynamite():
         return True
     return False
 
+# AI Action Info (for display)
+ai_action_info = {
+    'action': None,
+    'q_value': None,
+    'used_model': False
+}
+
+def get_ai_action_info():
+    return ai_action_info
+
+def set_ai_action_info(action, q_value, used_model):
+    global ai_action_info
+    ai_action_info = {
+        'action': action,
+        'q_value': q_value,
+        'used_model': used_model
+    }
+
 # Game speed management
 SPEED_LEVELS = [1, 2, 5, 10]  # Các mức tốc độ: x1, x2, x5, x10
 

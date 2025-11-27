@@ -324,13 +324,10 @@ class GameScene(Scene):
         """Tạo hoặc lấy level_id cho generated levels"""
         try:
             # Dựa trên level number để xác định difficulty
-            # level=0 → "train", level=1 → "easy", level=2 → "medium", ...
-            if self.level == 0:
-                difficulty = "train"
-            else:
-                difficulties = ["easy", "medium", "hard", "expert"]
-                difficulty_index = min(self.level - 1, len(difficulties) - 1)
-                difficulty = difficulties[difficulty_index]
+            # level=1 → "easy", level=2 → "medium", level=3 → "hard", level=4+ → "expert"
+            difficulties = ["easy", "medium", "hard", "expert"]
+            difficulty_index = min(self.level - 1, len(difficulties) - 1)
+            difficulty = difficulties[difficulty_index]
             
             # Tạo level_id unique
             level_id = f"GEN_L{self.level}_{random.randint(1000, 9999)}"
@@ -407,6 +404,15 @@ class GameScene(Scene):
         screen.blit(debug_font.render(f"Level: {self.current_level_id}", True, (255, 0, 0)), (10, 120))
         screen.blit(debug_font.render(f"Use Generated: {self.use_generated}", True, (255, 0, 0)), (10, 140))
         screen.blit(debug_font.render(f"Speed: x{game_speed}", True, (0, 255, 0)), (10, 160))  # Hiển thị game speed
+        
+        # AI Action Info: Hiển thị thông tin action và Q-value từ AI
+        from define import get_ai_action_info
+        ai_info = get_ai_action_info()
+        if ai_info['action'] is not None:
+            action_text = f"{'Model' if ai_info['used_model'] else 'Random'} action: {ai_info['action']}"
+            if ai_info['q_value'] is not None:
+                action_text += f" with Q-values: {ai_info['q_value']:.6e}"
+            screen.blit(debug_font.render(action_text, True, (0, 100, 255)), (10, 180))
 
         # SỬA: Kiểm tra explosive tồn tại trước khi truy cập thuộc tính
         if self.play_Explosive and self.explosive is not None:

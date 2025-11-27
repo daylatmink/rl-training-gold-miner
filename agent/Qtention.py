@@ -36,31 +36,31 @@ class Qtention(nn.Module):
         # Hai action query tokens (đếm rất ít tham số; nếu muốn loại khỏi budget thì có thể freeze)
         self.act_emb = nn.Parameter(torch.zeros(n_actions, d_model))  # [n_actions, d]
 
-        # Head chung d -> 1, áp vào mỗi ACT token để thu Q
-        self.head = nn.Linear(d_model, 1)
+        # Head MLP: d_model -> d_model -> 1 với GELU activation
+        self.head = nn.Sequential(
+            nn.Linear(d_model, d_model),
+            nn.GELU(),
+            nn.Linear(d_model, 1)
+        )
 
         # Embedding
         self.embedder = Embedder(d_model=d_model, dropout=dropout, max_items=max_items)
 
-        # Khởi tạo để action 0 có Q-value cao hơn action 1 LUÔN LUÔN
-        # Strategy: Tạo gap lớn giữa act_emb[0] và act_emb[1]
+        # Khởi tạo BALANCED - Để network TỰ HỌC thay vì bias
+        # Đảm bảo TẤT CẢ n_actions được khởi tạo công bằng
         
-        # 1. Init head với weights DƯƠNG (quan trọng!)
+        # 1. Init head MLP với Xavier (symmetric, không bias)
         with torch.no_grad():
-            # Weights dương → Q sẽ tăng theo embedding value
-            self.head.weight.data.uniform_(0.0, 0.02)  # Toàn dương
-            self.head.bias.data.fill_(0.0)
+            for m in self.head.modules():
+                if isinstance(m, nn.Linear):
+                    nn.init.xavier_uniform_(m.weight, gain=0.01)  # Small scale
+                    nn.init.zeros_(m.bias)
         
-        # 2. Init action embeddings với gap lớn
+        # 2. Init action embeddings SYMMETRIC - Scale theo sqrt(n_actions) cho stability
         with torch.no_grad():
-            # ACT0: embedding dương LỚN → Q(act0) cao
-            self.act_emb.data[0] = torch.ones(d_model) * 0.5  # Tăng từ 0.1 lên 0.5
-            # ACT1: embedding âm NHỎ → Q(act1) thấp
-            self.act_emb.data[1] = torch.ones(d_model) * (-0.5)  # Giảm từ -0.1 xuống -0.5
-            
-            # Thêm một chút noise nhỏ
-            self.act_emb.data[0] += torch.randn(d_model) * 0.01
-            self.act_emb.data[1] += torch.randn(d_model) * 0.01
+            # Với nhiều actions, dùng std nhỏ hơn để tránh variance lớn
+            std = 0.02 / (n_actions ** 0.5)  # Scale theo số action
+            nn.init.normal_(self.act_emb, mean=0.0, std=std)
 
     def forward(self, type_ids, item_feats, mov_idx=None, mov_feats=None, mask=None):
         """

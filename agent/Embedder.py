@@ -351,7 +351,7 @@ class Embedder(nn.Module):
         return tokens, mask  # [B, L, d_model], [B, L]
     
     @staticmethod
-    def preprocess_state(state, max_items=30):
+    def preprocess_state(state, max_items=30, return_batch = False):
         """
         STATIC METHOD: Preprocess state dict thành 4 tensors.
         
@@ -468,15 +468,20 @@ class Embedder(nn.Module):
                 mov_feats_list.append([dxl_norm, dxr_norm, float(item['direction'])])
         
         # Convert to numpy arrays
-        type_ids = np.array(type_ids_list, dtype=np.int64)
-        item_feats = np.array(feats_list, dtype=np.float32)
+        type_ids = torch.tensor(type_ids_list, dtype=torch.int64)
+        item_feats = torch.tensor(feats_list, dtype=torch.float32)
         
         if len(mov_idx_list) > 0:
-            mov_idx = np.array(mov_idx_list, dtype=np.int64)
-            mov_feats = np.array(mov_feats_list, dtype=np.float32)
+            mov_idx = torch.tensor(mov_idx_list, dtype=torch.int64)
+            mov_feats = torch.tensor(mov_feats_list, dtype=torch.float32)
         else:
             # Empty arrays
-            mov_idx = np.array([], dtype=np.int64)
-            mov_feats = np.array([], dtype=np.float32).reshape(0, 3)
+            mov_idx = torch.tensor([], dtype=torch.int64)
+            mov_feats = torch.tensor([], dtype=torch.float32).reshape(0, 3)
         
-        return type_ids, item_feats, mov_idx, mov_feats
+        if not return_batch:
+            return type_ids, item_feats, mov_idx, mov_feats
+        return (type_ids[torch.newaxis, :],
+                item_feats[torch.newaxis, :, :],
+                mov_idx[torch.newaxis, :],
+                mov_feats[torch.newaxis, :, :])

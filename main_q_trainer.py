@@ -4,7 +4,7 @@ Main script để train DQN agent cho Gold Miner
 
 from model.GoldMiner import GoldMinerEnv
 from agent.Qtention import Qtention
-from train_dqn import DQNTrainer
+from trainer.DQNTrainer import DQNTrainer
 
 
 def main_train(headless: bool = False, checkpoint: str = None):
@@ -18,21 +18,21 @@ def main_train(headless: bool = False, checkpoint: str = None):
     """
     # Hyperparameters
     config = {
-        'num_episodes': 200,
-        'lr': 3e-4,
-        'gamma': 1,
-        'epsilon_start': 0.8,    # Tăng exploration ban đầu để học cả 2 actions
+        'num_episodes': 500,
+        'lr': 5e-4,
+        'gamma': 0.9,
+        'epsilon_start': 0.1,    # Tăng exploration ban đầu để học cả 2 actions
         'epsilon_end': 0.01,     # Giữ một chút exploration
-        'epsilon_decay': 0.99,  # Decay chậm hơn: 0.3 -> 0.01 trong ~500 episodes
-        'buffer_size': 50000,
-        'batch_size': 128,
-        'target_update_freq': 200,
-        'train_freq': 1,         # Train mỗi bao nhiêu steps
-        'num_planning': 3,       # Số lần quét buffer (planning) hoặc số batches (standard)
-        'use_planning': False,    # True: planning approach, False: standard DQN
-        'save_freq': 1,
-        'eval_freq': 200,
-        'eval_episodes': 500,
+        'epsilon_decay': 0.999,  # Decay chậm hơn: 0.3 -> 0.01 trong ~500 episodes
+        'buffer_size': 320,
+        'batch_size': 64,
+        'target_update_freq': 20,
+        'train_freq': 1,         # Train mỗi 1 step (tăng overhead, giảm tốc độ)
+        'num_planning': 10,       # Số lần quét buffer (planning) hoặc số batches (standard)
+        'use_planning': True,    # True: planning approach, False: standard DQN
+        'save_freq': 10,
+        'eval_freq': 500,         # Evaluate mỗi 50 episodes thay vì 200
+        'eval_episodes': 5,      # Chỉ 5 episodes cho mỗi lần eval (nhanh hơn)
         'headless': headless,     # Headless mode
     }
     
@@ -50,12 +50,12 @@ def main_train(headless: bool = False, checkpoint: str = None):
     print(f"  Render mode: {render_mode} ({'with display' if not headless else 'headless - no window'})")
     env = GoldMinerEnv(
         render_mode=render_mode,  # None = headless (không mở cửa sổ), 'human' = hiển thị
-        max_steps=3600 * 2,    # 60 giây * 60 FPS
-        level=0,           # level=0 → difficulty "train"
+        max_steps=3600,        # 60 giây * 60 FPS
+        level=1,           # level=1 → difficulty "easy"
         use_generated_levels=True,
         c_dyna=10,       # Cost của dynamite
         c_step=0.0,        # Step cost (0 = không dùng)
-        c_pull=0.2,        # Penalty khi đang kéo (0 = không dùng)
+        c_pull=0,        # Penalty khi đang kéo (0 = không dùng)
         reward_scale=1000.0,  # Scale reward xuống 1000 lần
         game_speed=1       # Giữ 1x để physics chính xác, headless đã đủ nhanh
     )
@@ -64,12 +64,12 @@ def main_train(headless: bool = False, checkpoint: str = None):
     # Create agent
     print("\n[2/4] Creating agent...")
     agent = Qtention(
-        d_model=20,
-        n_actions=2,
-        nhead=4,
-        n_layers=2,
-        d_ff=24,
-        dropout=0.00,
+        d_model=36,
+        n_actions=30,
+        nhead=6,
+        n_layers=3,
+        d_ff=48,
+        dropout=0.1,
         max_items=30
     )
     
@@ -146,5 +146,5 @@ if __name__ == '__main__':
     args = parser.parse_args()
     
     # Nếu dùng --show thì headless=False (hiển thị), ngược lại headless=True (không hiển thị)
-    main_train(headless=not args.show, checkpoint=args.checkpoint)
-    # main_train(headless=False)
+    # main_train(headless=not args.show, checkpoint=args.checkpoint)
+    main_train(headless=False)
