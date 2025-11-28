@@ -10,7 +10,10 @@ import numpy as np
 import pygame
 import sys
 from typing import Optional, Tuple, Dict, Any
+from define import set_game_speed, set_use_fixed_timestep
 
+from entities.explosive import Explosive
+import random
 # Import game modules
 from define import *
 from scenes.game_scenes import GameScene
@@ -54,7 +57,7 @@ class GoldMinerEnv(gym.Env):
         self,
         render_mode: Optional[str] = None,
         max_steps: int = 3600,  # 60 giây * 60 FPS
-        level: int = 1,
+        levels: int | list = 1,  # Có thể là int hoặc list
         use_generated_levels: bool = True,
         c_dyna: float = 50.0,  # Cost của dynamite
         c_step: float = 0.0,  # Step cost (0 = không dùng)
@@ -66,7 +69,13 @@ class GoldMinerEnv(gym.Env):
         
         self.render_mode = render_mode
         self.max_steps = max_steps
-        self.level = level
+        # Nếu levels là list, lưu danh sách và sẽ sample random trong reset()
+        # Nếu levels là int, chuyển thành list có 1 phần tử
+        if isinstance(levels, list):
+            self.levels = levels
+        else:
+            self.levels = [levels]
+        self.current_level = self.levels[0]  # Mức hiện tại (sẽ được update trong reset)
         self.use_generated_levels = use_generated_levels
         self.c_dyna = c_dyna
         self.c_step = c_step
@@ -138,13 +147,15 @@ class GoldMinerEnv(gym.Env):
         reset_scaled_time()
         
         # Set game speed và enable fixed timestep cho RL training
-        from define import set_game_speed, set_use_fixed_timestep
         set_game_speed(self.game_speed)
         set_use_fixed_timestep(True)  # Enable fixed timestep cho RL training
         
+        # Sample random level từ list
+        self.current_level = random.choice(self.levels)
+        
         # Create new game scene
         self.game_scene = GameScene(
-            level=self.level,
+            level=self.current_level,
             tnt=0,
             speed=1,
             is_clover=False,
@@ -306,7 +317,6 @@ class GoldMinerEnv(gym.Env):
                     miner.state = 4
                     
                     # Create explosive
-                    from entities.explosive import Explosive
                     self.game_scene.explosive = Explosive(
                         rope.x2 - 128,
                         rope.y2 - 128,

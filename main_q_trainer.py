@@ -33,6 +33,7 @@ def main_train(headless: bool = False, checkpoint: str = None):
         'save_freq': 10,
         'eval_freq': 500,         # Evaluate mỗi 50 episodes thay vì 200
         'eval_episodes': 5,      # Chỉ 5 episodes cho mỗi lần eval (nhanh hơn)
+        'levels': list(range(1, 11)),      # List các levels, mỗi episode sẽ sample ngẫu nhiên
         'headless': headless,     # Headless mode
     }
     
@@ -51,12 +52,12 @@ def main_train(headless: bool = False, checkpoint: str = None):
     env = GoldMinerEnv(
         render_mode=render_mode,  # None = headless (không mở cửa sổ), 'human' = hiển thị
         max_steps=3600,        # 60 giây * 60 FPS
-        level=1,           # level=1 → difficulty "easy"
+        levels=config['levels'],  # List các levels để sample ngẫu nhiên
         use_generated_levels=True,
         c_dyna=10,       # Cost của dynamite
         c_step=0.0,        # Step cost (0 = không dùng)
         c_pull=0,        # Penalty khi đang kéo (0 = không dùng)
-        reward_scale=1000.0,  # Scale reward xuống 1000 lần
+        reward_scale=10000.0,  # Scale reward xuống 10000 lần
         game_speed=1       # Giữ 1x để physics chính xác, headless đã đủ nhanh
     )
     print("✓ Environment created")
@@ -64,11 +65,11 @@ def main_train(headless: bool = False, checkpoint: str = None):
     # Create agent
     print("\n[2/4] Creating agent...")
     agent = Qtention(
-        d_model=36,
-        n_actions=30,
-        nhead=6,
+        d_model=72,
+        n_actions=50,
+        nhead=8,
         n_layers=3,
-        d_ff=48,
+        d_ff=90,
         dropout=0.1,
         max_items=30
     )

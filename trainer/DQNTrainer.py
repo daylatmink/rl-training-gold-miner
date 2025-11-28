@@ -20,38 +20,58 @@ from model.GoldMiner import GoldMinerEnv
 from agent.Qtention import Qtention
 from agent.Embedder import Embedder
 
-# 30 actions - chia đều góc 15-165° thành 30 khoảng (5° mỗi khoảng)
+# 50 actions - chia đều góc 15-165° thành 50 khoảng (3° mỗi khoảng)
 angle_bins = [
-    (15.0, 20.0),    # Action 0
-    (20.0, 25.0),    # Action 1
-    (25.0, 30.0),    # Action 2
-    (30.0, 35.0),    # Action 3
-    (35.0, 40.0),    # Action 4
-    (40.0, 45.0),    # Action 5
-    (45.0, 50.0),    # Action 6
-    (50.0, 55.0),    # Action 7
-    (55.0, 60.0),    # Action 8
-    (60.0, 65.0),    # Action 9
-    (65.0, 70.0),    # Action 10
-    (70.0, 75.0),    # Action 11
-    (75.0, 80.0),    # Action 12
-    (80.0, 85.0),    # Action 13
-    (85.0, 90.0),    # Action 14
-    (90.0, 95.0),    # Action 15
-    (95.0, 100.0),   # Action 16
-    (100.0, 105.0),  # Action 17
-    (105.0, 110.0),  # Action 18
-    (110.0, 115.0),  # Action 19
-    (115.0, 120.0),  # Action 20
-    (120.0, 125.0),  # Action 21
-    (125.0, 130.0),  # Action 22
-    (130.0, 135.0),  # Action 23
-    (135.0, 140.0),  # Action 24
-    (140.0, 145.0),  # Action 25
-    (145.0, 150.0),  # Action 26
-    (150.0, 155.0),  # Action 27
-    (155.0, 160.0),  # Action 28
-    (160.0, 165.0)   # Action 29
+    (15.0, 18.0),    # Action 0
+    (18.0, 21.0),    # Action 1
+    (21.0, 24.0),    # Action 2
+    (24.0, 27.0),    # Action 3
+    (27.0, 30.0),    # Action 4
+    (30.0, 33.0),    # Action 5
+    (33.0, 36.0),    # Action 6
+    (36.0, 39.0),    # Action 7
+    (39.0, 42.0),    # Action 8
+    (42.0, 45.0),    # Action 9
+    (45.0, 48.0),    # Action 10
+    (48.0, 51.0),    # Action 11
+    (51.0, 54.0),    # Action 12
+    (54.0, 57.0),    # Action 13
+    (57.0, 60.0),    # Action 14
+    (60.0, 63.0),    # Action 15
+    (63.0, 66.0),    # Action 16
+    (66.0, 69.0),    # Action 17
+    (69.0, 72.0),    # Action 18
+    (72.0, 75.0),    # Action 19
+    (75.0, 78.0),    # Action 20
+    (78.0, 81.0),    # Action 21
+    (81.0, 84.0),    # Action 22
+    (84.0, 87.0),    # Action 23
+    (87.0, 90.0),    # Action 24
+    (90.0, 93.0),    # Action 25
+    (93.0, 96.0),    # Action 26
+    (96.0, 99.0),    # Action 27
+    (99.0, 102.0),   # Action 28
+    (102.0, 105.0),  # Action 29
+    (105.0, 108.0),  # Action 30
+    (108.0, 111.0),  # Action 31
+    (111.0, 114.0),  # Action 32
+    (114.0, 117.0),  # Action 33
+    (117.0, 120.0),  # Action 34
+    (120.0, 123.0),  # Action 35
+    (123.0, 126.0),  # Action 36
+    (126.0, 129.0),  # Action 37
+    (129.0, 132.0),  # Action 38
+    (132.0, 135.0),  # Action 39
+    (135.0, 138.0),  # Action 40
+    (138.0, 141.0),  # Action 41
+    (141.0, 144.0),  # Action 42
+    (144.0, 147.0),  # Action 43
+    (147.0, 150.0),  # Action 44
+    (150.0, 153.0),  # Action 45
+    (153.0, 156.0),  # Action 46
+    (156.0, 159.0),  # Action 47
+    (159.0, 162.0),  # Action 48
+    (162.0, 165.0)   # Action 49
 ]
 
 class ReplayBuffer:
@@ -437,8 +457,8 @@ class DQNTrainer:
             losses.append(avg_iter_loss)
             
             # Log loss cho mỗi lần quét
-            if cur_step % 600 == 0:
-                self.log(f"Step {cur_step % 3600}/3600  Planning {planning_iter+1}/{self.num_planning} - Avg Loss: {avg_iter_loss:.8f} - Batches: {num_batches}/{(total_samples + self.batch_size - 1) // self.batch_size} - Buffer: {total_samples}")
+                
+            self.log(f"Step {cur_step}  Planning {planning_iter+1}/{self.num_planning} - Avg Loss: {avg_iter_loss:.8f} - Batches: {num_batches}/{(total_samples + self.batch_size - 1) // self.batch_size} - Buffer: {total_samples}")
         
         return losses
     
