@@ -18,19 +18,19 @@ def main_train(headless: bool = False, checkpoint: str = None):
     """
     # Hyperparameters
     config = {
-        'num_episodes': 500,
+        'num_episodes': 100,
         'lr': 5e-4,
-        'gamma': 0.9,
+        'gamma': 0.8,
         'epsilon_start': 0.1,    # Tăng exploration ban đầu để học cả 2 actions
         'epsilon_end': 0.01,     # Giữ một chút exploration
         'epsilon_decay': 0.999,  # Decay chậm hơn: 0.3 -> 0.01 trong ~500 episodes
-        'buffer_size': 640,
+        'buffer_size': 1280,
         'batch_size': 64,
         'target_update_freq': 20,
         'train_freq': 1,         # Train mỗi 1 step (tăng overhead, giảm tốc độ)
         'num_planning': 10,       # Số lần quét buffer (planning) hoặc số batches (standard)
         'use_planning': True,    # True: planning approach, False: standard DQN
-        'save_freq': 10,
+        'save_freq': 20,
         'eval_freq': 500,         # Evaluate mỗi 50 episodes thay vì 200
         'eval_episodes': 5,      # Chỉ 5 episodes cho mỗi lần eval (nhanh hơn)
         'levels': list(range(1, 11)),      # List các levels, mỗi episode sẽ sample ngẫu nhiên
@@ -65,11 +65,11 @@ def main_train(headless: bool = False, checkpoint: str = None):
     # Create agent
     print("\n[2/4] Creating agent...")
     agent = Qtention(
-        d_model=36,
+        d_model=20,
         n_actions=50,
-        nhead=6,
-        n_layers=2,
-        d_ff=48,
+        nhead=4,
+        n_layers=3,
+        d_ff=24,
         dropout=0.1,
         max_items=30
     )

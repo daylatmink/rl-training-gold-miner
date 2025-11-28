@@ -30,7 +30,7 @@ def evaluate_agent_with_render(checkpoint_path: str, num_episodes: int = 5, fps:
     env = GoldMinerEnv(
         render_mode='human',  # Hiển thị game
         max_steps=3600,       # 60 giây * 60 FPS
-        levels=5,
+        levels=1,
         use_generated_levels=True,
         c_dyna=10,
         c_step=0.0,
@@ -42,12 +42,13 @@ def evaluate_agent_with_render(checkpoint_path: str, num_episodes: int = 5, fps:
     
     # Create agent
     print("\nCreating agent...")
+    
     agent = Qtention(
-        d_model=72,
+        d_model=20,
         n_actions=50,
-        nhead=8,
+        nhead=4,
         n_layers=3,
-        d_ff=88,
+        d_ff=24,
         dropout=0.1,
         max_items=30
     ).to(device)
