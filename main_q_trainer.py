@@ -24,7 +24,7 @@ def main_train(headless: bool = False, checkpoint: str = None):
         'epsilon_start': 0.1,    # Tăng exploration ban đầu để học cả 2 actions
         'epsilon_end': 0.01,     # Giữ một chút exploration
         'epsilon_decay': 0.999,  # Decay chậm hơn: 0.3 -> 0.01 trong ~500 episodes
-        'buffer_size': 320,
+        'buffer_size': 640,
         'batch_size': 64,
         'target_update_freq': 20,
         'train_freq': 1,         # Train mỗi 1 step (tăng overhead, giảm tốc độ)
@@ -65,11 +65,11 @@ def main_train(headless: bool = False, checkpoint: str = None):
     # Create agent
     print("\n[2/4] Creating agent...")
     agent = Qtention(
-        d_model=72,
+        d_model=36,
         n_actions=50,
-        nhead=8,
-        n_layers=3,
-        d_ff=90,
+        nhead=6,
+        n_layers=2,
+        d_ff=48,
         dropout=0.1,
         max_items=30
     )

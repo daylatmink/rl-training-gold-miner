@@ -13,15 +13,15 @@ class LevelGenerator:
             # 🎯 CONFIG THEO TỪNG DIFFICULTY - HOÀN TOÀN RIÊNG BIỆT
             "entity_types_by_difficulty": {
                 "easy": {
-                    # 🎯 EASY: Mức độ vừa phải để học - chỉ vàng + đá cơ bản
-                    "MiniRock": {"weight": 0.4, "min": 2, "max": 4},     # Tăng lên 2-4
-                    "NormalRock": {"weight": 0.3, "min": 1, "max": 3},   # Tăng lên 1-3
+                    # 🎯 EASY: Mức độ vừa phải để học - chỉ vàng + đá cơ bản (GIẢM 40%)
+                    "MiniRock": {"weight": 0.4, "min": 1, "max": 2},
+                    "NormalRock": {"weight": 0.3, "min": 0, "max": 2},
                     "BigRock": {"weight": 0.0, "min": 0, "max": 0},
-                    "MiniGold": {"weight": 0.8, "min": 4, "max": 7},     # Tăng lên 4-7
-                    "NormalGold": {"weight": 0.8, "min": 3, "max": 5},   # Tăng lên 3-5
-                    "BigGold": {"weight": 0.8, "min": 2, "max": 4},      # Tăng lên 2-4
+                    "MiniGold": {"weight": 0.8, "min": 2, "max": 4},
+                    "NormalGold": {"weight": 0.8, "min": 2, "max": 3},
+                    "BigGold": {"weight": 0.8, "min": 1, "max": 2},
                     "Diamond": {"weight": 0.0, "min": 0, "max": 0},
-                    "QuestionBag": {"weight": 0.2, "min": 0, "max": 2},  # Tăng lên 0-2
+                    "QuestionBag": {"weight": 0.2, "min": 0, "max": 1},
                     "Mole": {"weight": 0.0, "min": 0, "max": 0},
                     "MoleWithDiamond": {"weight": 0.0, "min": 0, "max": 0},
                     "TNT": {"weight": 0.0, "min": 0, "max": 0},
@@ -29,15 +29,15 @@ class LevelGenerator:
                     "Bone": {"weight": 0.0, "min": 0, "max": 0}
                 },
                 "medium": {
-                    # 🎯 MEDIUM: Nhiều vàng + đá, có đá to, đá dày tầng trên
-                    "MiniRock": {"weight": 0.5, "min": 3, "max": 6},
-                    "NormalRock": {"weight": 0.4, "min": 2, "max": 4},
-                    "BigRock": {"weight": 0.3, "min": 1, "max": 3},
-                    "MiniGold": {"weight": 0.6, "min": 4, "max": 7},     # Giảm MiniGold
-                    "NormalGold": {"weight": 0.5, "min": 3, "max": 5},   # Giảm NormalGold
-                    "BigGold": {"weight": 0.8, "min": 3, "max": 6},      # TĂNG BigGold: 1-2 → 3-6
+                    # 🎯 MEDIUM: Nhiều vàng + đá, có đá to, đá dày tầng trên (GIẢM 35%)
+                    "MiniRock": {"weight": 0.5, "min": 2, "max": 4},
+                    "NormalRock": {"weight": 0.4, "min": 1, "max": 3},
+                    "BigRock": {"weight": 0.3, "min": 0, "max": 2},
+                    "MiniGold": {"weight": 0.6, "min": 2, "max": 4},
+                    "NormalGold": {"weight": 0.5, "min": 2, "max": 3},
+                    "BigGold": {"weight": 0.8, "min": 2, "max": 4},
                     "Diamond": {"weight": 0.0, "min": 0, "max": 0},
-                    "QuestionBag": {"weight": 0.3, "min": 1, "max": 3},
+                    "QuestionBag": {"weight": 0.3, "min": 0, "max": 2},
                     "Mole": {"weight": 0.0, "min": 0, "max": 0},
                     "MoleWithDiamond": {"weight": 0.0, "min": 0, "max": 0},
                     "TNT": {"weight": 0.0, "min": 0, "max": 0},
@@ -45,15 +45,15 @@ class LevelGenerator:
                     "Bone": {"weight": 0.0, "min": 0, "max": 0}
                 },
                 "hard": {
-                    # 🎯 HARD: Xuất hiện kim cương (2-5), nhiều đá to
-                    "MiniRock": {"weight": 0.3, "min": 2, "max": 4},
-                    "NormalRock": {"weight": 0.4, "min": 2, "max": 5},
-                    "BigRock": {"weight": 0.5, "min": 2, "max": 4},
-                    "MiniGold": {"weight": 0.3, "min": 2, "max": 4},     # Giảm MiniGold
-                    "NormalGold": {"weight": 0.4, "min": 2, "max": 4},
-                    "BigGold": {"weight": 0.7, "min": 3, "max": 5},      # TĂNG BigGold: 1-2 → 3-5
-                    "Diamond": {"weight": 0.8, "min": 2, "max": 5},
-                    "QuestionBag": {"weight": 0.2, "min": 1, "max": 2},
+                    # 🎯 HARD: Xuất hiện kim cương, nhiều đá to (GIẢM 35%)
+                    "MiniRock": {"weight": 0.3, "min": 1, "max": 3},
+                    "NormalRock": {"weight": 0.4, "min": 1, "max": 3},
+                    "BigRock": {"weight": 0.5, "min": 1, "max": 3},
+                    "MiniGold": {"weight": 0.3, "min": 1, "max": 3},
+                    "NormalGold": {"weight": 0.4, "min": 1, "max": 3},
+                    "BigGold": {"weight": 0.7, "min": 2, "max": 3},
+                    "Diamond": {"weight": 0.8, "min": 1, "max": 3},
+                    "QuestionBag": {"weight": 0.2, "min": 0, "max": 2},
                     "Mole": {"weight": 0.0, "min": 0, "max": 0},
                     "MoleWithDiamond": {"weight": 0.0, "min": 0, "max": 0},
                     "TNT": {"weight": 0.0, "min": 0, "max": 0},
@@ -208,7 +208,7 @@ class LevelGenerator:
             "spawn_rules": {
                 "x_range": (50, 1200),
                 "y_range": (200, 650),
-                "min_distance": 100,  # Giảm từ 100 xuống 60 để items dày hơn
+                "min_distance": 120,  # Tăng lên 120 để items thưa hơn
                 "regions": {
                     "top": {"y_range": (200, 350), "density": 0.2},     # Tăng từ 0.3 lên 0.35
                     "middle": {"y_range": (350, 500), "density": 0.3},  # Tăng từ 0.4 lên 0.45
@@ -225,10 +225,10 @@ class LevelGenerator:
                 }
             },
             "difficulty_profiles": {
-                "easy": {"total_entities": (8, 12), "value_ratio": 0.8},       # Giảm xuống: 8-12 items
-                "medium": {"total_entities": (12, 18), "value_ratio": 0.7},    # Giảm xuống: 12-18 items
-                "hard": {"total_entities": (15, 22), "value_ratio": 0.6},      # Giảm xuống: 15-22 items
-                "expert": {"total_entities": (18, 25), "value_ratio": 0.5}     # Giảm xuống: 18-25 items
+                "easy": {"total_entities": (5, 8), "value_ratio": 0.8},       # Giảm thêm 30%: 5-8 items
+                "medium": {"total_entities": (8, 12), "value_ratio": 0.7},    # Giảm thêm 30%: 8-12 items
+                "hard": {"total_entities": (10, 15), "value_ratio": 0.6},     # Giảm thêm 30%: 10-15 items
+                "expert": {"total_entities": (12, 18), "value_ratio": 0.5}    # Giảm thêm 30%: 12-18 items
             }
         }
     def generate_level(self, level_id: str, difficulty: str = "medium") -> Dict:

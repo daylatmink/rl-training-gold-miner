@@ -1,17 +1,27 @@
 {
-  "timestamp": "2025-11-28T15:58:36.080329",
-  "total_episodes": 3,
-  "total_steps": 38,
-  "final_epsilon": 0.0997002999,
+  "timestamp": "2025-11-28T23:37:16.008652",
+  "total_episodes": 8,
+  "total_steps": 89,
+  "final_epsilon": 0.09920279440699441,
   "episode_rewards": [
-    0.1824,
-    0.175,
-    0.007500000000000001
+    0.20679999999999998,
+    0.12109999999999999,
+    0.125,
+    0.0804,
+    0.006,
+    0.0089,
+    0.0613,
+    0.125
   ],
   "episode_lengths": [
-    13,
     12,
-    12
+    11,
+    10,
+    13,
+    10,
+    12,
+    11,
+    10
   ],
   "hyperparameters": {
     "gamma": 0.9,
@@ -20,6 +30,6 @@
     "epsilon_decay": 0.999,
     "batch_size": 64,
     "target_update_freq": 20,
-    "buffer_size": 320
+    "buffer_size": 640
   }
 }
