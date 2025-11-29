@@ -8,7 +8,7 @@ import pygame
 import argparse
 from model.GoldMiner import GoldMinerEnv
 from agent.Qtention import Qtention
-from trainer.DQNTrainer import DQNTrainer
+from trainer.QtentionTrainer import DQNTrainer
 
 
 def evaluate_agent_with_render(checkpoint_path: str, num_episodes: int = 5, fps: int = 60):
@@ -30,7 +30,7 @@ def evaluate_agent_with_render(checkpoint_path: str, num_episodes: int = 5, fps:
     env = GoldMinerEnv(
         render_mode='human',  # Hiển thị game
         max_steps=3600,       # 60 giây * 60 FPS
-        levels=1,
+        levels=0,
         use_generated_levels=True,
         c_dyna=10,
         c_step=0.0,

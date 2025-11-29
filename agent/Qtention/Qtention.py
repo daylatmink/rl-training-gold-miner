@@ -1,15 +1,8 @@
 import torch
 import torch.nn as nn
-from agent.Embedder import Embedder
+from agent.Qtention.Embedder import Embedder
 
 class Qtention(nn.Module):
-    """
-    Q-head: 2-layer Transformer encoder (pre-norm), d_model=20, d_ff=24, nhead=4.
-    Nhận đầu vào đã ở dạng token embed (B, L, 20).
-    Tự thêm 2 action query tokens [ACT0], [ACT1] rồi trả về Q(s,0), Q(s,1).
-
-    Tham số xấp xỉ: ~5,549 (không tính input embeddings/projections).
-    """
 
     def __init__(self, d_model=20, d_ff=24, nhead=4, n_layers=2, dropout=0.0, max_items=30, n_actions=2):
         super().__init__()

@@ -17,8 +17,8 @@ from tqdm import tqdm
 import logging
 
 from model.GoldMiner import GoldMinerEnv
-from agent.Qtention import Qtention
-from agent.Embedder import Embedder
+from agent.Qtention.Qtention import Qtention
+from agent.Qtention.Embedder import Embedder
 
 # 50 actions - chia đều góc 15-165° thành 50 khoảng (3° mỗi khoảng)
 angle_bins = [
@@ -269,7 +269,7 @@ class ReplayBuffer:
         return len(self.buffer)
 
 
-class DQNTrainer:
+class QtentionTrainer:
     """Trainer cho Deep Q-Learning"""
     
     def __init__(

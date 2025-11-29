@@ -12,6 +12,22 @@ class LevelGenerator:
             
             # 🎯 CONFIG THEO TỪNG DIFFICULTY - HOÀN TOÀN RIÊNG BIỆT
             "entity_types_by_difficulty": {
+                "train": {
+                    # 🎯 TRAIN: CHỈ 1 ITEM NGẪU NHIÊN - Để agent học cơ bản nhất
+                    "MiniRock": {"weight": 0.2, "min": 0, "max": 1},
+                    "NormalRock": {"weight": 0.2, "min": 0, "max": 1},
+                    "BigRock": {"weight": 0.1, "min": 0, "max": 1},
+                    "MiniGold": {"weight": 0.5, "min": 0, "max": 1},
+                    "NormalGold": {"weight": 0.5, "min": 0, "max": 1},
+                    "BigGold": {"weight": 0.3, "min": 0, "max": 1},
+                    "Diamond": {"weight": 0.2, "min": 0, "max": 1},
+                    "QuestionBag": {"weight": 0.1, "min": 0, "max": 1},
+                    "Mole": {"weight": 0.0, "min": 0, "max": 0},
+                    "MoleWithDiamond": {"weight": 0.0, "min": 0, "max": 0},
+                    "TNT": {"weight": 0.0, "min": 0, "max": 0},
+                    "Skull": {"weight": 0.0, "min": 0, "max": 0},
+                    "Bone": {"weight": 0.0, "min": 0, "max": 0}
+                },
                 "easy": {
                     # 🎯 EASY: Mức độ vừa phải để học - chỉ vàng + đá cơ bản (GIẢM 40%)
                     "MiniRock": {"weight": 0.4, "min": 1, "max": 2},
@@ -225,6 +241,7 @@ class LevelGenerator:
                 }
             },
             "difficulty_profiles": {
+                "train": {"total_entities": (1, 1), "value_ratio": 1.0},      # CHỈ 1 ITEM DUY NHẤT
                 "easy": {"total_entities": (5, 8), "value_ratio": 0.8},       # Giảm thêm 30%: 5-8 items
                 "medium": {"total_entities": (8, 12), "value_ratio": 0.7},    # Giảm thêm 30%: 8-12 items
                 "hard": {"total_entities": (10, 15), "value_ratio": 0.6},     # Giảm thêm 30%: 10-15 items
@@ -527,12 +544,17 @@ class ProceduralLevelManager:
             if difficulty is None:
                 # Auto difficulty progression
                 level_num = self._extract_level_number(level_id)
-                # Level vô hạn - lặp lại progression
-                progression_index = (level_num - 1) % len(self.difficulty_progression)
-                difficulty = self.difficulty_progression[progression_index]
+                
+                # 🎯 ÁNH XẠ: Level 0 = train difficulty
+                if level_num == 0:
+                    difficulty = "train"
+                else:
+                    # Level vô hạn - lặp lại progression
+                    progression_index = (level_num - 1) % len(self.difficulty_progression)
+                    difficulty = self.difficulty_progression[progression_index]
             
             # Đảm bảo difficulty hợp lệ
-            valid_difficulties = ["easy", "medium", "hard", "expert"]
+            valid_difficulties = ["train", "easy", "medium", "hard", "expert"]
             if difficulty not in valid_difficulties:
                 difficulty = "medium"
             
@@ -555,8 +577,15 @@ class ProceduralLevelManager:
     def _extract_level_number(self, level_id: str) -> int:
         """Trích xuất số level từ level_id"""
         import re
-        match = re.search(r'L(\d+)', level_id)
-        return int(match.group(1)) if match else 1
+        # Tìm số trong level_id (hỗ trợ cả level 0)
+        match = re.search(r'[_L](\d+)', level_id)
+        if match:
+            return int(match.group(1))
+        # Nếu level_id là số thuần túy
+        try:
+            return int(level_id)
+        except:
+            return 1
 class RLTrainingEnvironment:
     def __init__(self, level_manager: ProceduralLevelManager):
         self.level_manager = level_manager

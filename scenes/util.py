@@ -95,7 +95,15 @@ def load_level(level, is_clover=False, is_gem=False, is_rock=False):
     # KIỂM TRA NẾU LÀ GENERATED LEVEL
     if level.startswith('GEN_') or level.startswith('TRAIN_'):
         try:
-            level_data = level_manager.get_level(level, "medium")  # difficulty mặc định
+            # 🎯 ÁNH XẠ DIFFICULTY DỰA TRÊN LEVEL
+            if isinstance(level, int) and level == 0:
+                difficulty = "train"  # Level 0 = train difficulty
+            elif level.startswith('TRAIN_'):
+                difficulty = "train"  # TRAIN_ prefix = train difficulty
+            else:
+                difficulty = "medium"  # Mặc định
+            
+            level_data = level_manager.get_level(level, difficulty)
             
             if level_data:
                 # Load background (sử dụng background mặc định)
@@ -213,8 +221,13 @@ def random_level(level_number, use_generated=False):
     """Chọn level ngẫu nhiên - có thể dùng generated levels"""
     if use_generated:
         # Sử dụng level được generate ngẫu nhiên
-        difficulties = ["easy", "medium", "hard", "expert"]
-        difficulty = difficulties[min(level_number - 1, len(difficulties) - 1)]
+        # 🎯 ÁNH XẠ: Level 0 = train, Level 1+ = easy/medium/hard/expert
+        if level_number == 0:
+            difficulty = "train"  # CHỈ 1 ITEM NGẪU NHIÊN
+        else:
+            difficulties = ["easy", "medium", "hard", "expert"]
+            difficulty = difficulties[min(level_number - 1, len(difficulties) - 1)]
+        
         level_id = f"RANDOM_{level_number}_{random.randint(1000, 9999)}"
         return level_id
     else:

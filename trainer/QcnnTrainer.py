@@ -1,0 +1,695 @@
+"""
+Deep Q-Learning Training cho Gold Miner
+Sử dụng Qtention network với Experience Replay và Target Network
+"""
+
+import torch
+import torch.nn as nn
+import torch.optim as optim
+import numpy as np
+from collections import deque
+import random
+from typing import Deque, Tuple, List
+import json
+import os
+from datetime import datetime
+from tqdm import tqdm
+import logging
+
+from model.GoldMiner import GoldMinerEnv
+from agent.QCNN.QCNN import QCNN
+from agent.QCNN.Embedder import Embedder
+
+# 50 actions - chia đều góc 15-165° thành 50 khoảng (3° mỗi khoảng)
+angle_bins = [
+    (15.0, 18.0),    # Action 0
+    (18.0, 21.0),    # Action 1
+    (21.0, 24.0),    # Action 2
+    (24.0, 27.0),    # Action 3
+    (27.0, 30.0),    # Action 4
+    (30.0, 33.0),    # Action 5
+    (33.0, 36.0),    # Action 6
+    (36.0, 39.0),    # Action 7
+    (39.0, 42.0),    # Action 8
+    (42.0, 45.0),    # Action 9
+    (45.0, 48.0),    # Action 10
+    (48.0, 51.0),    # Action 11
+    (51.0, 54.0),    # Action 12
+    (54.0, 57.0),    # Action 13
+    (57.0, 60.0),    # Action 14
+    (60.0, 63.0),    # Action 15
+    (63.0, 66.0),    # Action 16
+    (66.0, 69.0),    # Action 17
+    (69.0, 72.0),    # Action 18
+    (72.0, 75.0),    # Action 19
+    (75.0, 78.0),    # Action 20
+    (78.0, 81.0),    # Action 21
+    (81.0, 84.0),    # Action 22
+    (84.0, 87.0),    # Action 23
+    (87.0, 90.0),    # Action 24
+    (90.0, 93.0),    # Action 25
+    (93.0, 96.0),    # Action 26
+    (96.0, 99.0),    # Action 27
+    (99.0, 102.0),   # Action 28
+    (102.0, 105.0),  # Action 29
+    (105.0, 108.0),  # Action 30
+    (108.0, 111.0),  # Action 31
+    (111.0, 114.0),  # Action 32
+    (114.0, 117.0),  # Action 33
+    (117.0, 120.0),  # Action 34
+    (120.0, 123.0),  # Action 35
+    (123.0, 126.0),  # Action 36
+    (126.0, 129.0),  # Action 37
+    (129.0, 132.0),  # Action 38
+    (132.0, 135.0),  # Action 39
+    (135.0, 138.0),  # Action 40
+    (138.0, 141.0),  # Action 41
+    (141.0, 144.0),  # Action 42
+    (144.0, 147.0),  # Action 43
+    (147.0, 150.0),  # Action 44
+    (150.0, 153.0),  # Action 45
+    (153.0, 156.0),  # Action 46
+    (156.0, 159.0),  # Action 47
+    (159.0, 162.0),  # Action 48
+    (162.0, 165.0)   # Action 49
+]
+
+class ReplayBuffer:
+    """
+    Experience Replay Buffer cho QCNN.
+    
+    Lưu preprocessed TORCH TENSORS (CPU) thay vì numpy arrays.
+    Mỗi transition: (env_feats, item_feats, action, reward, 
+                     next_env_feats, next_item_feats, done)
+    
+    sample() method TỰ ĐỘNG stack và pad các tensors thành batch ready-to-use.
+    """
+    
+    def __init__(self, capacity: int = 5000):
+        self.buffer: Deque = deque(maxlen=capacity)
+    
+    def push(self, env_feats: torch.Tensor, item_feats: torch.Tensor,
+             action: int, reward: float, 
+             next_env_feats: torch.Tensor, next_item_feats: torch.Tensor,
+             done: bool):
+        """
+        Thêm transition vào buffer.
+        Nhận torch tensors (CPU) - đã được preprocess sẵn.
+        
+        Args:
+            env_feats: [10] - Environment features
+            item_feats: [N, 23] - Item features (variable length)
+            action: int - Action taken
+            reward: float - Reward received
+            next_env_feats: [10] - Next environment features
+            next_item_feats: [M, 23] - Next item features (variable length)
+            done: bool - Episode done flag
+        """
+        self.buffer.append((
+            env_feats, item_feats,
+            action, reward,
+            next_env_feats, next_item_feats,
+            done
+        ))
+    
+    def sample(self, batch_size: int) -> dict:
+        """
+        Sample random batch từ buffer (batch_size=1 cho QCNN, không cần padding).
+        
+        Returns:
+            dict với keys (tất cả đều là torch.Tensor trên CPU):
+                'env_feats': Tensor [1, 10] - Environment features
+                'item_feats': Tensor [1, N, 23] - Item features (no padding needed)
+                'actions': Tensor [1]
+                'rewards': Tensor [1]
+                'next_env_feats': Tensor [1, 10]
+                'next_item_feats': Tensor [1, M, 23]
+                'dones': Tensor [1]
+        """
+        # Sample random transition (batch_size should be 1)
+        assert batch_size == 1, "QCNN trainer only supports batch_size=1"
+        transition = random.sample(self.buffer, 1)[0]
+        
+        # Unpack transition
+        env_feats, item_feats, action, reward, next_env_feats, next_item_feats, done = transition
+        
+        # Add batch dimension
+        env_feats = env_feats.unsqueeze(0)  # [10] -> [1, 10]
+        item_feats = item_feats.unsqueeze(0)  # [N, 23] -> [1, N, 23]
+        next_env_feats = next_env_feats.unsqueeze(0)  # [10] -> [1, 10]
+        next_item_feats = next_item_feats.unsqueeze(0)  # [M, 23] -> [1, M, 23]
+        
+        return {
+            'env_feats': env_feats,
+            'item_feats': item_feats,
+            'actions': torch.tensor([action], dtype=torch.long),
+            'rewards': torch.tensor([reward], dtype=torch.float32),
+            'next_env_feats': next_env_feats,
+            'next_item_feats': next_item_feats,
+            'dones': torch.tensor([done], dtype=torch.float32)
+        }
+    
+    def stack_batch(self, transitions: List[Tuple]) -> dict:
+        """
+        Stack một list transitions thành batch dict (dùng cho planning approach).
+        Với QCNN, batch_size=1 nên chỉ lấy 1 transition tại một thời điểm.
+        
+        Args:
+            transitions: List of transitions từ buffer (should have 1 element)
+            
+        Returns:
+            dict tương tự như sample() - tất cả đều torch.Tensor
+        """
+        # With batch_size=1, only process 1 transition
+        assert len(transitions) == 1, "QCNN trainer only supports batch_size=1"
+        
+        env_feats, item_feats, action, reward, next_env_feats, next_item_feats, done = transitions[0]
+        
+        # Add batch dimension
+        env_feats = env_feats.unsqueeze(0)  # [10] -> [1, 10]
+        item_feats = item_feats.unsqueeze(0)  # [N, 23] -> [1, N, 23]
+        next_env_feats = next_env_feats.unsqueeze(0)  # [10] -> [1, 10]
+        next_item_feats = next_item_feats.unsqueeze(0)  # [M, 23] -> [1, M, 23]
+        
+        return {
+            'env_feats': env_feats,
+            'item_feats': item_feats,
+            'actions': torch.tensor([action], dtype=torch.long),
+            'rewards': torch.tensor([reward], dtype=torch.float32),
+            'next_env_feats': next_env_feats,
+            'next_item_feats': next_item_feats,
+            'dones': torch.tensor([done], dtype=torch.float32)
+        }
+    
+    def __len__(self) -> int:
+        return len(self.buffer)
+
+
+class QcnnTrainer:
+    """Trainer cho Deep Q-Learning"""
+    
+    def __init__(
+        self,
+        env: GoldMinerEnv,
+        agent: QCNN,
+        lr: float = 1e-4,
+        gamma: float = 1.0,
+        epsilon_start: float = 0.5,  # Thấp hơn vì chỉ có 2 actions
+        epsilon_end: float = 0.01,    # End sớm hơn
+        epsilon_decay: float = 0.99,  # Decay nhanh hơn, replay buffer đã giúp break correlation
+        buffer_size: int = 320,
+        batch_size: int = 64,
+        target_update_freq: int = 1000,
+        train_freq: int = 1,  # Tần suất training: train mỗi train_freq steps
+        num_planning: int = 1,  # Số lần quét buffer (planning) hoặc số batches (standard)
+        use_planning: bool = True,  # True: planning approach, False: standard DQN
+        device: str = 'cuda' if torch.cuda.is_available() else 'cpu'
+    ):
+        self.env = env
+        self.agent = agent.to(device)
+        self.device = device
+        
+        # Hyperparameters
+        self.gamma = gamma
+        self.epsilon = epsilon_start
+        self.epsilon_end = epsilon_end
+        self.epsilon_decay = epsilon_decay
+        self.batch_size = batch_size
+        self.target_update_freq = target_update_freq
+        self.train_freq = train_freq
+        self.num_planning = num_planning
+        self.use_planning = use_planning
+        
+        # Target network
+        self.target_agent = QCNN(
+            d_model=agent.d_model,
+            n_actions=agent.n_actions,
+            d_hidden=agent.d_hidden,
+        ).to(device)
+        self.update_target_network()
+        self.target_agent.eval()
+        
+        # Optimizer và loss
+        self.optimizer = optim.Adam(self.agent.parameters(), lr=lr)
+        self.loss_fn = nn.MSELoss()
+        
+        # Replay buffer
+        self.replay_buffer = ReplayBuffer(buffer_size)
+        
+        # Tracking
+        self.total_steps = 0
+        self.episode_rewards = []
+        self.episode_lengths = []
+        self.losses = []
+        
+        # Logger (will be setup in train())
+        self.logger = None
+        
+    def setup_logger(self, log_file: str = 'training.log'):
+        """Setup logger to write to file"""
+        self.logger = logging.getLogger('DQNTrainer')
+        self.logger.setLevel(logging.INFO)
+        
+        # Clear existing handlers
+        self.logger.handlers = []
+        
+        # File handler (chỉ log vào file, không ra terminal)
+        fh = logging.FileHandler(log_file, mode='w')
+        fh.setLevel(logging.INFO)
+        
+        # Formatter
+        formatter = logging.Formatter('%(asctime)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+        fh.setFormatter(formatter)
+        
+        self.logger.addHandler(fh)
+        
+    def log(self, message: str):
+        """Log message to file only"""
+        if self.logger:
+            self.logger.info(message)
+        else:
+            print(message)
+        
+    def update_target_network(self):
+        """Copy weights từ agent sang target_agent"""
+        self.target_agent.load_state_dict(self.agent.state_dict())
+    
+    def select_action(self, state: dict, training: bool = True) -> tuple:
+        """
+        Chọn action với epsilon-greedy policy
+        
+        Args:
+            state: Game state dict
+            training: Nếu True thì dùng epsilon-greedy, False thì greedy
+            
+        Returns:
+            (action, used_model): action được chọn và flag cho biết có dùng model không
+        """
+        # Preprocess state for QCNN
+        env_feats, item_feats = Embedder.preprocess_state(state, return_batch=True)
+        
+        # Convert to device
+        env_feats = env_feats.to(self.device)  # [1, 10]
+        item_feats = item_feats.to(self.device)  # [1, N, 23]
+        
+        # Epsilon-greedy action selection
+        if training and random.random() < self.epsilon:
+            action = random.randint(0, self.agent.n_actions - 1)
+            used_model = False
+            q_value = None
+        else:
+            with torch.no_grad():
+                q_values = self.agent((env_feats, item_feats))  # [1, n_actions]
+                action = q_values.argmax(dim=1).item()
+                q_value = q_values[0][action].cpu().item()
+            used_model = True
+        
+        # Lưu thông tin action vào global state để hiển thị trên màn hình
+        from define import set_ai_action_info
+        set_ai_action_info(action, q_value, used_model)
+        
+        return action, used_model
+    
+    def train_step(self, cur_step) -> list:
+        """
+        Training step với 2 modes:
+        - Planning approach: Quét qua toàn bộ buffer num_planning lần
+        - Standard DQN: Sample num_planning batches ngẫu nhiên
+        
+        Args:
+            cur_step: Current step number (for logging)
+        
+        Returns:
+            losses: List of losses
+        """
+        if len(self.replay_buffer) == 0:
+            return []
+        
+        if self.use_planning:
+            return self._train_step_planning(cur_step)
+        else:
+            return self._train_step_standard(cur_step)
+    
+    def _train_step_planning(self, cur_step) -> list:
+        """
+        Planning approach: Quét qua toàn bộ buffer num_planning lần
+        Mỗi planning step: quét qua toàn bộ buffer, mỗi phần tử một lần
+        Batch cuối cùng có thể có size nhỏ hơn batch_size
+        """
+        losses = []
+        
+        # Quét qua buffer num_planning lần
+        for planning_iter in range(self.num_planning):
+            iter_loss = 0.0
+            num_batches = 0
+            
+            # Lấy tất cả transitions từ buffer
+            all_transitions = list(self.replay_buffer.buffer)
+            total_samples = len(all_transitions)
+            
+            # Shuffle để tạo random order mỗi lần quét
+            random.shuffle(all_transitions)
+            
+            # Quét qua toàn bộ buffer theo batches
+            for batch_start in range(0, total_samples, self.batch_size):
+                batch_end = min(batch_start + self.batch_size, total_samples)
+                transitions = all_transitions[batch_start:batch_end]
+                
+                # Stack transitions thành batch dict
+                batch = self.replay_buffer.stack_batch(transitions)
+                
+                loss = self._train_on_batch(batch)
+                iter_loss += loss
+                num_batches += 1
+            
+            # Tính avg loss cho lần quét này
+            avg_iter_loss = iter_loss / num_batches if num_batches > 0 else 0.0
+            losses.append(avg_iter_loss)
+            
+            # Log loss cho mỗi lần quét
+                
+            self.log(f"Step {cur_step}  Planning {planning_iter+1}/{self.num_planning} - Avg Loss: {avg_iter_loss:.8f} - Batches: {num_batches}/{(total_samples + self.batch_size - 1) // self.batch_size} - Buffer: {total_samples}")
+        
+        return losses
+    
+    def _train_step_standard(self, cur_step) -> list:
+        """
+        Standard DQN: Sample num_planning batches ngẫu nhiên và train
+        """
+        if len(self.replay_buffer) < self.batch_size:
+            return []
+        
+        losses = []
+        
+        # Sample và train trên num_planning batches
+        for batch_idx in range(self.num_planning):
+            # Sample random batch
+            batch = self.replay_buffer.sample(self.batch_size)
+            
+            loss = self._train_on_batch(batch)
+            losses.append(loss)
+            
+            # Log loss cho mỗi batch
+            if cur_step % 6 == 0:
+                self.log(f"Step {cur_step}  Batch {batch_idx+1}/{self.num_planning} - Loss: {loss:.8f} - Buffer: {len(self.replay_buffer)}")
+        
+        return losses
+    
+    def _train_on_batch(self, batch: dict) -> float:
+        """
+        Train trên một batch và trả về loss.
+        
+        Args:
+            batch: Dict từ buffer.sample() - TẤT CẢ ĐÃ LÀ TORCH TENSORS (CPU)
+                   Chỉ cần .to(device) để chuyển sang GPU
+            
+        Returns:
+            loss: Loss value
+        """
+        # Move tensors from CPU to device (GPU/CPU)
+        env_feats = batch['env_feats'].to(self.device)  # [1, 10]
+        item_feats = batch['item_feats'].to(self.device)  # [1, N, 23]
+        next_env_feats = batch['next_env_feats'].to(self.device)  # [1, 10]
+        next_item_feats = batch['next_item_feats'].to(self.device)  # [1, M, 23]
+        
+        actions = batch['actions'].to(self.device)  # [1]
+        rewards = batch['rewards'].to(self.device)  # [1]
+        dones = batch['dones'].to(self.device)  # [1]
+        
+        # Compute Q(s, a) for QCNN
+        q_values = self.agent((env_feats, item_feats))  # [1, n_actions]
+        q_values = q_values.gather(1, actions.unsqueeze(1)).squeeze(1)  # [1]
+        
+        # Compute target
+        with torch.no_grad():
+            next_q_values = self.target_agent((next_env_feats, next_item_feats))  # [1, n_actions]
+            next_q_values = next_q_values.max(1)[0]  # [1]
+            targets = rewards + self.gamma * next_q_values * (1 - dones)
+        
+        # Compute loss
+        loss = self.loss_fn(q_values, targets)
+        
+        # Backprop
+        self.optimizer.zero_grad()
+        loss.backward()
+        torch.nn.utils.clip_grad_norm_(self.agent.parameters(), max_norm=10.0)
+        self.optimizer.step()
+        
+        return loss.item()
+    
+    def train_episode(self) -> Tuple[float, int]:
+        """
+        Train 1 episode
+        
+        Returns:
+            total_reward: Tổng reward trong episode
+            steps: Số steps trong episode
+        """
+        state, _ = self.env.reset()
+        episode_reward = 0.0
+        episode_steps = 0
+        current_reward = 0
+        action_buffer = None
+        state_buffer = None
+        new_state_buffer = None
+        reward_buffer = 0
+        angle_decision = None
+        done = False
+        
+        def update_replay_buffer():
+            nonlocal action_buffer, reward_buffer, episode_reward, episode_steps
+            
+            old_env_feats, old_item_feats = state_buffer
+            new_env_feats, new_item_feats = Embedder.preprocess_state(state)
+            self.replay_buffer.push(
+                old_env_feats, old_item_feats,
+                action_buffer, reward_buffer,
+                new_env_feats, new_item_feats,
+                done
+            )
+            
+            self.total_steps += 1
+            if self.total_steps % self.target_update_freq == 0:
+                self.update_target_network()
+            if self.total_steps % self.train_freq == 0:
+                self.log(f"Episode step {episode_steps} reward: {episode_reward}")
+                losses = self.train_step(self.total_steps)
+                if losses:  # Nếu có loss (buffer đủ lớn)
+                    self.losses.extend(losses)  # Thêm tất cả losses vào list
+                    
+            episode_reward += reward_buffer
+            episode_steps += 1
+            
+            reward_buffer = 0
+            action_buffer = None
+            
+            return new_env_feats, new_item_feats
+        
+        while True:
+            if not done and (state['rope_state']['state'] in ['expanding', 'retracting'] or state['rope_state']['timer'] > 0):
+                next_state, reward, terminated, truncated, info = self.env.step(0)  # No-op action
+            else:
+                if angle_decision is None or done:
+                    if state_buffer is not None:     
+                        new_state_buffer = update_replay_buffer()
+                    if done:
+                        break
+                    action_buffer, used_model = self.select_action(state, training=True)
+                    angle_decision = angle_bins[action_buffer]
+                    state_buffer = new_state_buffer if state_buffer is not None else Embedder.preprocess_state(state)
+                
+                current_angle = state['rope_state']['direction']
+                if angle_decision is not None and angle_decision[0] <= current_angle and current_angle < angle_decision[1]:
+                    next_state, reward, terminated, truncated, info = self.env.step(1)  # Fire action
+                    angle_decision = None
+                else:
+                    next_state, reward, terminated, truncated, info = self.env.step(0)  # No-op action
+    
+            done = terminated or truncated
+            reward_buffer += reward
+            state = next_state
+        
+        # Decay epsilon
+        self.epsilon = max(self.epsilon_end, self.epsilon * self.epsilon_decay)
+        
+        return episode_reward, episode_steps
+    
+    def train(
+        self,
+        num_episodes: int,
+        save_freq: int = 100,
+        eval_freq: int = 50,
+        eval_episodes: int = 5,
+        save_dir: str = 'checkpoints',
+        log_file: str = 'training_log.json',
+        training_log_file: str = 'training.log'
+    ):
+        """
+        Train agent cho num_episodes
+        
+        Args:
+            num_episodes: Số episodes để train
+            save_freq: Tần suất lưu checkpoint (episodes)
+            eval_freq: Tần suất evaluation (episodes)
+            eval_episodes: Số episodes cho mỗi lần eval
+            save_dir: Thư mục lưu checkpoints
+            log_file: File log training metrics (JSON)
+            training_log_file: File log quá trình training (text)
+        """
+        os.makedirs(save_dir, exist_ok=True)
+        
+        # Setup logger
+        self.setup_logger(training_log_file)
+        
+        self.log(f"Starting training for {num_episodes} episodes")
+        self.log(f"Device: {self.device}")
+        self.log(f"Replay buffer size: {len(self.replay_buffer)}")
+        self.log("-" * 60)
+        
+        for episode in range(1, num_episodes + 1):
+            self.log(f"\nStarting Episode {episode}/{num_episodes}")
+            
+            # Train episode
+            episode_reward, episode_steps = self.train_episode()
+            self.episode_rewards.append(episode_reward)
+            self.episode_lengths.append(episode_steps)
+            
+            # In điểm kiếm được sau mỗi episode
+            self.log(f"Episode {episode} completed | Score: {episode_reward:.3f} | Steps: {episode_steps}")
+            print(f"Episode {episode} completed | Score: {episode_reward:.3f} | Steps: {episode_steps}")
+            
+            # Logging
+            if episode % 10 == 0:
+                avg_reward = np.mean(self.episode_rewards[-10:])
+                avg_length = np.mean(self.episode_lengths[-10:])
+                avg_loss = np.mean(self.losses[-100:]) if len(self.losses) > 0 else 0.0
+                
+                self.log(f"Episode {episode}/{num_episodes} | "
+                      f"Reward: {episode_reward:.3f} | "
+                      f"Avg(10): {avg_reward:.8f} | "
+                      f"Steps: {episode_steps} | "
+                      f"Loss: {avg_loss:.8f} | "
+                      f"Epsilon: {self.epsilon:.3f} | "
+                      f"Buffer: {len(self.replay_buffer)}")
+            
+            # Evaluation
+            if episode % eval_freq == 0:
+                eval_reward = self.evaluate(eval_episodes)
+                self.log(f"\n{'='*60}")
+                self.log(f"Evaluation after {episode} episodes: {eval_reward:.3f}")
+                self.log(f"{'='*60}\n")
+            
+            # Save checkpoint
+            if episode % save_freq == 0:
+                checkpoint_path = os.path.join(save_dir, f'checkpoint_step{episode}.pt')
+                self.save_checkpoint(checkpoint_path)
+                self.log(f"Saved checkpoint: {checkpoint_path}")
+        
+        # Save final model
+        final_path = os.path.join(save_dir, 'final_model.pt')
+        self.save_checkpoint(final_path)
+        self.log(f"\nTraining completed! Final model saved: {final_path}")
+        
+        # Save training log
+        self.save_training_log(log_file)
+    
+    def evaluate(self, num_episodes: int = 5) -> float:
+        """
+        Evaluate agent với greedy policy - logic giống train_episode
+        
+        Args:
+            num_episodes: Số episodes để evaluate
+            
+        Returns:
+            avg_reward: Average reward
+        """
+        self.agent.eval()
+        eval_rewards = []
+        
+        for _ in range(num_episodes):
+            state, _ = self.env.reset()
+            episode_reward = 0.0
+            episode_steps = 0
+            action_buffer = None
+            reward_buffer = 0
+            angle_decision = None
+            done = False
+            
+            while True:
+                if not done and (state['rope_state']['state'] in ['expanding', 'retracting'] or state['rope_state']['timer'] > 0):
+                    next_state, reward, terminated, truncated, info = self.env.step(0)  # No-op action
+                else:
+                    if angle_decision is None or done:
+                        if action_buffer is not None:
+                            episode_reward += reward_buffer
+                            episode_steps += 1
+                            reward_buffer = 0
+                            action_buffer = None
+                        if done:
+                            break
+                        action_buffer, used_model = self.select_action(state, training=False)  # Greedy
+                        angle_decision = angle_bins[action_buffer]
+                    
+                    current_angle = state['rope_state']['direction']
+                    if angle_decision is not None and angle_decision[0] <= current_angle and current_angle < angle_decision[1]:
+                        next_state, reward, terminated, truncated, info = self.env.step(1)  # Fire action
+                        angle_decision = None
+                    else:
+                        next_state, reward, terminated, truncated, info = self.env.step(0)  # No-op action
+        
+                done = terminated or truncated
+                reward_buffer += reward
+                state = next_state
+            
+            eval_rewards.append(episode_reward)
+        
+        self.agent.train()
+        return np.mean(eval_rewards)
+    
+    def save_checkpoint(self, path: str):
+        """Lưu checkpoint"""
+        torch.save({
+            'agent_state_dict': self.agent.state_dict(),
+            'target_agent_state_dict': self.target_agent.state_dict(),
+            'optimizer_state_dict': self.optimizer.state_dict(),
+            'epsilon': self.epsilon,
+            'total_steps': self.total_steps,
+            'episode_rewards': self.episode_rewards,
+            'episode_lengths': self.episode_lengths,
+        }, path)
+    
+    def load_checkpoint(self, path: str):
+        """Load checkpoint"""
+        checkpoint = torch.load(path, map_location=self.device)
+        self.agent.load_state_dict(checkpoint['agent_state_dict'])
+        self.target_agent.load_state_dict(checkpoint['target_agent_state_dict'])
+        self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        self.epsilon = checkpoint['epsilon']
+        self.total_steps = checkpoint['total_steps']
+        self.episode_rewards = checkpoint['episode_rewards']
+        self.episode_lengths = checkpoint['episode_lengths']
+        self.log(f"Loaded checkpoint from {path}")
+    
+    def save_training_log(self, path: str):
+        """Lưu training metrics"""
+        log = {
+            'timestamp': datetime.now().isoformat(),
+            'total_episodes': len(self.episode_rewards),
+            'total_steps': self.total_steps,
+            'final_epsilon': self.epsilon,
+            'episode_rewards': self.episode_rewards,
+            'episode_lengths': self.episode_lengths,
+            'hyperparameters': {
+                'gamma': self.gamma,
+                'epsilon_start': 0.5,  # Updated default
+                'epsilon_end': self.epsilon_end,
+                'epsilon_decay': self.epsilon_decay,
+                'batch_size': self.batch_size,
+                'target_update_freq': self.target_update_freq,
+                'buffer_size': self.replay_buffer.buffer.maxlen,
+            }
+        }
+        
+        with open(path, 'w') as f:
+            json.dump(log, f, indent=2)
+        self.log(f"Saved training log: {path}")

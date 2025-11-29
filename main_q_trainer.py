@@ -3,11 +3,13 @@ Main script để train DQN agent cho Gold Miner
 """
 
 from model.GoldMiner import GoldMinerEnv
-from agent.Qtention import Qtention
-from trainer.DQNTrainer import DQNTrainer
+from agent.Qtention.Qtention import Qtention
+from agent.QCNN.QCNN import QCNN
+from trainer.QtentionTrainer import QtentionTrainer
+from trainer.QcnnTrainer import QcnnTrainer
 
 
-def main_train(headless: bool = False, checkpoint: str = None):
+def main_train(headless: bool = False, checkpoint: str = None, net: str = "attention"):
     """
     Main training function
     
@@ -15,15 +17,16 @@ def main_train(headless: bool = False, checkpoint: str = None):
         headless: Nếu True, train không mở cửa sổ pygame (nhanh hơn)
                   Nếu False, train với cửa sổ hiển thị
         checkpoint: Path to checkpoint file to resume training
+        net: Network architecture - "attention" (Qtention) hoặc "cnn" (QCNN)
     """
     # Hyperparameters
     config = {
         'num_episodes': 100,
         'lr': 5e-4,
         'gamma': 0.8,
-        'epsilon_start': 0.1,    # Tăng exploration ban đầu để học cả 2 actions
+        'epsilon_start': 0.6,    # Tăng exploration ban đầu để học cả 2 actions
         'epsilon_end': 0.01,     # Giữ một chút exploration
-        'epsilon_decay': 0.999,  # Decay chậm hơn: 0.3 -> 0.01 trong ~500 episodes
+        'epsilon_decay': 0.8,  # Decay chậm hơn: 0.3 -> 0.01 trong ~500 episodes
         'buffer_size': 1280,
         'batch_size': 64,
         'target_update_freq': 20,
@@ -33,7 +36,7 @@ def main_train(headless: bool = False, checkpoint: str = None):
         'save_freq': 20,
         'eval_freq': 500,         # Evaluate mỗi 50 episodes thay vì 200
         'eval_episodes': 5,      # Chỉ 5 episodes cho mỗi lần eval (nhanh hơn)
-        'levels': list(range(1, 11)),      # List các levels, mỗi episode sẽ sample ngẫu nhiên
+        'levels': [0], #list(range(1, 11)),      # List các levels, mỗi episode sẽ sample ngẫu nhiên
         'headless': headless,     # Headless mode
     }
     
@@ -64,15 +67,28 @@ def main_train(headless: bool = False, checkpoint: str = None):
     
     # Create agent
     print("\n[2/4] Creating agent...")
-    agent = Qtention(
-        d_model=20,
-        n_actions=50,
-        nhead=4,
-        n_layers=3,
-        d_ff=24,
-        dropout=0.1,
-        max_items=30
-    )
+    print(f"  Network architecture: {net}")
+    
+    if net == "attention":
+        agent = Qtention(
+            d_model=20,
+            n_actions=50,
+            nhead=4,
+            n_layers=3,
+            d_ff=24,
+            dropout=0.1,
+            max_items=30
+        )
+    elif net == "cnn":
+        agent = QCNN(
+            d_model=24,
+            n_actions=50,
+            d_hidden=36,
+            dropout=0.1
+        )
+        config['batch_size']=1
+    else:
+        raise ValueError(f"Invalid network type: {net}. Choose 'attention' or 'cnn'")
     
     total_params = sum(p.numel() for p in agent.parameters())
     trainable_params = sum(p.numel() for p in agent.parameters() if p.requires_grad)
@@ -82,21 +98,41 @@ def main_train(headless: bool = False, checkpoint: str = None):
     
     # Create trainer
     print("\n[3/4] Creating trainer...")
-    trainer = DQNTrainer(
-        env=env,
-        agent=agent,
-        lr=config['lr'],
-        gamma=config['gamma'],
-        epsilon_start=config['epsilon_start'],
-        epsilon_end=config['epsilon_end'],
-        epsilon_decay=config['epsilon_decay'],
-        buffer_size=config['buffer_size'],
-        batch_size=config['batch_size'],
-        target_update_freq=config['target_update_freq'],
-        train_freq=config['train_freq'],
-        num_planning=config['num_planning'],
-        use_planning=config['use_planning']
-    )
+    if net == "attention":
+        trainer = QtentionTrainer(
+            env=env,
+            agent=agent,
+            lr=config['lr'],
+            gamma=config['gamma'],
+            epsilon_start=config['epsilon_start'],
+            epsilon_end=config['epsilon_end'],
+            epsilon_decay=config['epsilon_decay'],
+            buffer_size=config['buffer_size'],
+            batch_size=config['batch_size'],
+            target_update_freq=config['target_update_freq'],
+            train_freq=config['train_freq'],
+            num_planning=config['num_planning'],
+            use_planning=config['use_planning']
+        )
+    elif net == "cnn":
+        trainer = QcnnTrainer(
+            env=env,
+            agent=agent,
+            lr=config['lr'],
+            gamma=config['gamma'],
+            epsilon_start=config['epsilon_start'],
+            epsilon_end=config['epsilon_end'],
+            epsilon_decay=config['epsilon_decay'],
+            buffer_size=config['buffer_size'],
+            batch_size=config['batch_size'],
+            target_update_freq=config['target_update_freq'],
+            train_freq=config['train_freq'],
+            num_planning=config['num_planning'],
+            use_planning=config['use_planning']
+        )
+    else:
+        raise ValueError(f"Invalid network type for trainer: {net}. Choose 'attention'")
+    
     print(f"✓ Trainer created on device: {trainer.device}")
     print(f"  Training mode: {'Planning' if config['use_planning'] else 'Standard DQN'}")
     
@@ -144,8 +180,10 @@ if __name__ == '__main__':
                         help='Show pygame window during training (default: headless mode)')
     parser.add_argument('--checkpoint', type=str, default=None,
                         help='Path to checkpoint file to resume training (default: checkpoints/checkpoint.pt)')
+    parser.add_argument('--net', type=str, default='attention', choices=['attention', 'cnn'],
+                        help='Network architecture: attention (Qtention) or cnn (QCNN) (default: attention)')
     args = parser.parse_args()
     
     # Nếu dùng --show thì headless=False (hiển thị), ngược lại headless=True (không hiển thị)
-    # main_train(headless=not args.show, checkpoint=args.checkpoint)
-    main_train(headless=False)
+    # main_train(headless=not args.show, checkpoint=args.checkpoint, net=args.net)
+    main_train(headless=False, net=args.net)
