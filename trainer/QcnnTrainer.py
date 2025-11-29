@@ -78,111 +78,161 @@ class ReplayBuffer:
     """
     Experience Replay Buffer cho QCNN.
     
+    Tổ chức buffer theo (cnt, next_cnt) - số lượng items của state trước và sau.
+    Mỗi (cnt, next_cnt) có một deque riêng để states có cùng shape có thể batch được
+    mà KHÔNG CẦN PADDING.
+    
     Lưu preprocessed TORCH TENSORS (CPU) thay vì numpy arrays.
     Mỗi transition: (env_feats, item_feats, action, reward, 
                      next_env_feats, next_item_feats, done)
-    
-    sample() method TỰ ĐỘNG stack và pad các tensors thành batch ready-to-use.
     """
     
-    def __init__(self, capacity: int = 5000):
-        self.buffer: Deque = deque(maxlen=capacity)
+    def __init__(self, capacity_per_group: int = 200):
+        """
+        Args:
+            capacity_per_group: Capacity cho mỗi (cnt, next_cnt) queue
+        """
+        self.buffers = {}  # Dict[(int, int), Deque] - key là (cnt, next_cnt)
+        self.capacity_per_group = capacity_per_group
     
     def push(self, env_feats: torch.Tensor, item_feats: torch.Tensor,
              action: int, reward: float, 
              next_env_feats: torch.Tensor, next_item_feats: torch.Tensor,
              done: bool):
         """
-        Thêm transition vào buffer.
-        Nhận torch tensors (CPU) - đã được preprocess sẵn.
+        Thêm transition vào buffer của (cnt, next_cnt) tương ứng.
         
         Args:
             env_feats: [10] - Environment features
-            item_feats: [N, 23] - Item features (variable length)
+            item_feats: [N, 23] - Item features
             action: int - Action taken
             reward: float - Reward received
             next_env_feats: [10] - Next environment features
-            next_item_feats: [M, 23] - Next item features (variable length)
+            next_item_feats: [M, 23] - Next item features
             done: bool - Episode done flag
         """
-        self.buffer.append((
+        # Lấy cnt và next_cnt để quyết định queue nào
+        cnt = len(item_feats)
+        next_cnt = len(next_item_feats)
+        key = (cnt, next_cnt)
+        
+        # Tạo buffer mới cho key này nếu chưa có
+        if key not in self.buffers:
+            self.buffers[key] = deque(maxlen=self.capacity_per_group)
+        
+        # Thêm vào buffer của key này
+        self.buffers[key].append((
             env_feats, item_feats,
             action, reward,
             next_env_feats, next_item_feats,
             done
         ))
     
-    def sample(self, batch_size: int) -> dict:
+    def sample(self, cnt: int, next_cnt: int, batch_size: int) -> dict:
         """
-        Sample random batch từ buffer (batch_size=1 cho QCNN, không cần padding).
+        Sample random batch từ buffer của (cnt, next_cnt) cụ thể.
         
+        Args:
+            cnt: Số lượng items của state hiện tại
+            next_cnt: Số lượng items của next state
+            batch_size: Batch size
+            
         Returns:
             dict với keys (tất cả đều là torch.Tensor trên CPU):
-                'env_feats': Tensor [1, 10] - Environment features
-                'item_feats': Tensor [1, N, 23] - Item features (no padding needed)
-                'actions': Tensor [1]
-                'rewards': Tensor [1]
-                'next_env_feats': Tensor [1, 10]
-                'next_item_feats': Tensor [1, M, 23]
-                'dones': Tensor [1]
+                'env_feats': Tensor [B, 10] - Environment features
+                'item_feats': Tensor [B, cnt, 23] - Item features (same shape)
+                'actions': Tensor [B]
+                'rewards': Tensor [B]
+                'next_env_feats': Tensor [B, 10]
+                'next_item_feats': Tensor [B, next_cnt, 23] - No padding needed!
+                'dones': Tensor [B]
         """
-        # Sample random transition (batch_size should be 1)
-        assert batch_size == 1, "QCNN trainer only supports batch_size=1"
-        transition = random.sample(self.buffer, 1)[0]
+        # Kiểm tra buffer có đủ samples không
+        key = (cnt, next_cnt)
+        if key not in self.buffers or len(self.buffers[key]) < batch_size:
+            return None
         
-        # Unpack transition
-        env_feats, item_feats, action, reward, next_env_feats, next_item_feats, done = transition
+        # Sample random transitions từ buffer của key này
+        transitions = random.sample(self.buffers[key], batch_size)
         
-        # Add batch dimension
-        env_feats = env_feats.unsqueeze(0)  # [10] -> [1, 10]
-        item_feats = item_feats.unsqueeze(0)  # [N, 23] -> [1, N, 23]
-        next_env_feats = next_env_feats.unsqueeze(0)  # [10] -> [1, 10]
-        next_item_feats = next_item_feats.unsqueeze(0)  # [M, 23] -> [1, M, 23]
+        # Unpack batch
+        env_feats_list, item_feats_list, actions, rewards, \
+        next_env_feats_list, next_item_feats_list, dones = zip(*transitions)
+        
+        # Stack env_feats (fixed size [10])
+        env_feats = torch.stack(env_feats_list)  # [B, 10]
+        next_env_feats = torch.stack(next_env_feats_list)  # [B, 10]
+        
+        # Stack item_feats - same size [cnt, 23] for all in this group
+        item_feats = torch.stack(item_feats_list)  # [B, cnt, 23]
+        
+        # Stack next_item_feats - same size [next_cnt, 23] for all in this group
+        # KHÔNG CẦN PADDING vì tất cả đều có cùng next_cnt!
+        next_item_feats = torch.stack(next_item_feats_list)  # [B, next_cnt, 23]
+        
+        # Convert lists to tensors
+        actions = torch.tensor(actions, dtype=torch.long)
+        rewards = torch.tensor(rewards, dtype=torch.float32)
+        dones = torch.tensor(dones, dtype=torch.float32)
         
         return {
             'env_feats': env_feats,
             'item_feats': item_feats,
-            'actions': torch.tensor([action], dtype=torch.long),
-            'rewards': torch.tensor([reward], dtype=torch.float32),
+            'actions': actions,
+            'rewards': rewards,
             'next_env_feats': next_env_feats,
             'next_item_feats': next_item_feats,
-            'dones': torch.tensor([done], dtype=torch.float32)
+            'dones': dones
         }
     
     def stack_batch(self, transitions: List[Tuple]) -> dict:
         """
         Stack một list transitions thành batch dict (dùng cho planning approach).
-        Với QCNN, batch_size=1 nên chỉ lấy 1 transition tại một thời điểm.
+        Các transitions có cùng (cnt, next_cnt) nên có thể stack trực tiếp KHÔNG CẦN PADDING.
         
         Args:
-            transitions: List of transitions từ buffer (should have 1 element)
+            transitions: List of transitions từ buffer (cùng cnt và next_cnt)
             
         Returns:
             dict tương tự như sample() - tất cả đều torch.Tensor
         """
-        # With batch_size=1, only process 1 transition
-        assert len(transitions) == 1, "QCNN trainer only supports batch_size=1"
+        # Unpack batch
+        env_feats_list, item_feats_list, actions, rewards, \
+        next_env_feats_list, next_item_feats_list, dones = zip(*transitions)
         
-        env_feats, item_feats, action, reward, next_env_feats, next_item_feats, done = transitions[0]
+        # Stack env_feats (fixed size [10])
+        env_feats = torch.stack(env_feats_list)  # [B, 10]
+        next_env_feats = torch.stack(next_env_feats_list)  # [B, 10]
         
-        # Add batch dimension
-        env_feats = env_feats.unsqueeze(0)  # [10] -> [1, 10]
-        item_feats = item_feats.unsqueeze(0)  # [N, 23] -> [1, N, 23]
-        next_env_feats = next_env_feats.unsqueeze(0)  # [10] -> [1, 10]
-        next_item_feats = next_item_feats.unsqueeze(0)  # [M, 23] -> [1, M, 23]
+        # Stack item_feats (same cnt for all transitions)
+        item_feats = torch.stack(item_feats_list)  # [B, cnt, 23]
+        
+        # Stack next_item_feats (same next_cnt for all transitions)
+        # KHÔNG CẦN PADDING vì tất cả có cùng next_cnt!
+        next_item_feats = torch.stack(next_item_feats_list)  # [B, next_cnt, 23]
+        
+        # Convert lists to tensors
+        actions = torch.tensor(actions, dtype=torch.long)
+        rewards = torch.tensor(rewards, dtype=torch.float32)
+        dones = torch.tensor(dones, dtype=torch.float32)
         
         return {
             'env_feats': env_feats,
             'item_feats': item_feats,
-            'actions': torch.tensor([action], dtype=torch.long),
-            'rewards': torch.tensor([reward], dtype=torch.float32),
+            'actions': actions,
+            'rewards': rewards,
             'next_env_feats': next_env_feats,
             'next_item_feats': next_item_feats,
-            'dones': torch.tensor([done], dtype=torch.float32)
+            'dones': dones
         }
     
     def __len__(self) -> int:
-        return len(self.buffer)
+        """Tổng số transitions trong tất cả buffers"""
+        return sum(len(buffer) for buffer in self.buffers.values())
+    
+    def get_all_groups(self) -> List[Tuple[int, int]]:
+        """Lấy danh sách tất cả (cnt, next_cnt) có trong buffers"""
+        return list(self.buffers.keys())
 
 
 class QcnnTrainer:
@@ -332,9 +382,8 @@ class QcnnTrainer:
     
     def _train_step_planning(self, cur_step) -> list:
         """
-        Planning approach: Quét qua toàn bộ buffer num_planning lần
-        Mỗi planning step: quét qua toàn bộ buffer, mỗi phần tử một lần
-        Batch cuối cùng có thể có size nhỏ hơn batch_size
+        Planning approach: Quét qua toàn bộ buffer num_planning lần.
+        Loop qua từng (cnt, next_cnt) group, mỗi group train riêng với batch_size.
         """
         losses = []
         
@@ -343,55 +392,76 @@ class QcnnTrainer:
             iter_loss = 0.0
             num_batches = 0
             
-            # Lấy tất cả transitions từ buffer
-            all_transitions = list(self.replay_buffer.buffer)
-            total_samples = len(all_transitions)
-            
-            # Shuffle để tạo random order mỗi lần quét
-            random.shuffle(all_transitions)
-            
-            # Quét qua toàn bộ buffer theo batches
-            for batch_start in range(0, total_samples, self.batch_size):
-                batch_end = min(batch_start + self.batch_size, total_samples)
-                transitions = all_transitions[batch_start:batch_end]
+            # Loop qua từng (cnt, next_cnt) group có trong buffer
+            for (cnt, next_cnt) in self.replay_buffer.get_all_groups():
+                group_buffer = self.replay_buffer.buffers[(cnt, next_cnt)]
                 
-                # Stack transitions thành batch dict
-                batch = self.replay_buffer.stack_batch(transitions)
+                # Lấy tất cả transitions của group này
+                all_transitions = list(group_buffer)
+                total_samples = len(all_transitions)
                 
-                loss = self._train_on_batch(batch)
-                iter_loss += loss
-                num_batches += 1
+                if total_samples == 0:
+                    continue  # Skip nếu không có samples
+                
+                # Shuffle để tạo random order mỗi lần quét
+                random.shuffle(all_transitions)
+                
+                # Quét qua toàn bộ buffer theo batches
+                for batch_start in range(0, total_samples, self.batch_size):
+                    batch_end = min(batch_start + self.batch_size, total_samples)
+                    transitions = all_transitions[batch_start:batch_end]
+                    
+                    # Train dù batch nhỏ hơn batch_size (lấy hết những gì có)
+                    # Stack transitions thành batch dict - NO PADDING NEEDED!
+                    batch = self.replay_buffer.stack_batch(transitions)
+                    
+                    loss = self._train_on_batch(batch)
+                    iter_loss += loss
+                    num_batches += 1
             
             # Tính avg loss cho lần quét này
             avg_iter_loss = iter_loss / num_batches if num_batches > 0 else 0.0
             losses.append(avg_iter_loss)
             
             # Log loss cho mỗi lần quét
-                
-            self.log(f"Step {cur_step}  Planning {planning_iter+1}/{self.num_planning} - Avg Loss: {avg_iter_loss:.8f} - Batches: {num_batches}/{(total_samples + self.batch_size - 1) // self.batch_size} - Buffer: {total_samples}")
+            self.log(f"Step {cur_step}  Planning {planning_iter+1}/{self.num_planning} - Avg Loss: {avg_iter_loss:.8f} - Batches: {num_batches} - Buffer: {len(self.replay_buffer)}")
         
         return losses
     
     def _train_step_standard(self, cur_step) -> list:
         """
-        Standard DQN: Sample num_planning batches ngẫu nhiên và train
+        Standard DQN: Sample num_planning batches ngẫu nhiên và train.
+        Random chọn (cnt, next_cnt) group, sau đó sample batch từ group đó.
         """
         if len(self.replay_buffer) < self.batch_size:
             return []
         
         losses = []
         
+        # Lấy danh sách các groups có đủ samples
+        available_groups = [(cnt, next_cnt) for (cnt, next_cnt) in self.replay_buffer.get_all_groups() 
+                           if len(self.replay_buffer.buffers[(cnt, next_cnt)]) >= self.batch_size]
+        
+        if len(available_groups) == 0:
+            return []
+        
         # Sample và train trên num_planning batches
         for batch_idx in range(self.num_planning):
-            # Sample random batch
-            batch = self.replay_buffer.sample(self.batch_size)
+            # Random chọn một group
+            cnt, next_cnt = random.choice(available_groups)
+            
+            # Sample batch từ group đó
+            batch = self.replay_buffer.sample(cnt, next_cnt, self.batch_size)
+            
+            if batch is None:
+                continue
             
             loss = self._train_on_batch(batch)
             losses.append(loss)
             
             # Log loss cho mỗi batch
             if cur_step % 6 == 0:
-                self.log(f"Step {cur_step}  Batch {batch_idx+1}/{self.num_planning} - Loss: {loss:.8f} - Buffer: {len(self.replay_buffer)}")
+                self.log(f"Step {cur_step}  Batch {batch_idx+1}/{self.num_planning} - Loss: {loss:.8f} - cnt: ({cnt},{next_cnt}) - Buffer: {len(self.replay_buffer)}")
         
         return losses
     
@@ -686,7 +756,7 @@ class QcnnTrainer:
                 'epsilon_decay': self.epsilon_decay,
                 'batch_size': self.batch_size,
                 'target_update_freq': self.target_update_freq,
-                'buffer_size': self.replay_buffer.buffer.maxlen,
+                'buffer_capacity_per_group': self.replay_buffer.capacity_per_group,
             }
         }
         

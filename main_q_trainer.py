@@ -21,22 +21,22 @@ def main_train(headless: bool = False, checkpoint: str = None, net: str = "atten
     """
     # Hyperparameters
     config = {
-        'num_episodes': 100,
+        'num_episodes': 1000,
         'lr': 5e-4,
         'gamma': 0.8,
-        'epsilon_start': 0.6,    # Tăng exploration ban đầu để học cả 2 actions
+        'epsilon_start': 0.4,    # Tăng exploration ban đầu để học cả 2 actions
         'epsilon_end': 0.01,     # Giữ một chút exploration
         'epsilon_decay': 0.8,  # Decay chậm hơn: 0.3 -> 0.01 trong ~500 episodes
         'buffer_size': 1280,
         'batch_size': 64,
         'target_update_freq': 20,
         'train_freq': 1,         # Train mỗi 1 step (tăng overhead, giảm tốc độ)
-        'num_planning': 10,       # Số lần quét buffer (planning) hoặc số batches (standard)
-        'use_planning': True,    # True: planning approach, False: standard DQN
+        'num_planning': 16,       # Số lần quét buffer (planning) hoặc số batches (standard)
+        'use_planning': False,    # True: planning approach, False: standard DQN
         'save_freq': 20,
         'eval_freq': 500,         # Evaluate mỗi 50 episodes thay vì 200
         'eval_episodes': 5,      # Chỉ 5 episodes cho mỗi lần eval (nhanh hơn)
-        'levels': [0], #list(range(1, 11)),      # List các levels, mỗi episode sẽ sample ngẫu nhiên
+        'levels': list(range(1, 11)),      # List các levels, mỗi episode sẽ sample ngẫu nhiên
         'headless': headless,     # Headless mode
     }
     
