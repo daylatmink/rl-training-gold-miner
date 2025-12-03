@@ -1,0 +1,21 @@
+{
+  "timestamp": "2025-12-03T09:27:40.331484",
+  "total_episodes": 1,
+  "total_steps": 1,
+  "final_epsilon": 0.32000000000000006,
+  "episode_rewards": [
+    0.014099996536970139
+  ],
+  "episode_lengths": [
+    11
+  ],
+  "hyperparameters": {
+    "gamma": 0.9,
+    "epsilon_start": 0.5,
+    "epsilon_end": 0.05,
+    "epsilon_decay": 0.8,
+    "batch_size": 64,
+    "target_update_freq": 20,
+    "buffer_size": 500
+  }
+}
