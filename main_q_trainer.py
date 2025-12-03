@@ -7,11 +7,12 @@ from agent.Qtention.Qtention import Qtention
 from agent.QCNN.QCNN import QCNN
 from agent.QCnnRnn.QCnnRnn import QCnnRnn
 from trainer.QCnnRnnTrainer import QCnnRnnTrainer
+from trainer.DoubleQCnnRnnTrainer import DoubleQCnnRnnTrainer
 from trainer.QtentionTrainer import QtentionTrainer
 from trainer.QcnnTrainer import QcnnTrainer
 
 
-def main_train(headless: bool = False, checkpoint: str = None, net: str = "attention", warmup_path: str = None):
+def main_train(headless: bool = False, checkpoint: str = None, net: str = "attention", warmup_path: str = None, strategy: str = "Q"):
     """
     Main training function
     
@@ -19,7 +20,8 @@ def main_train(headless: bool = False, checkpoint: str = None, net: str = "atten
         headless: Nếu True, train không mở cửa sổ pygame (nhanh hơn)
                   Nếu False, train với cửa sổ hiển thị
         checkpoint: Path to checkpoint file to resume training
-        net: Network architecture - "attention" (Qtention) hoặc "cnn" (QCNN)
+        net: Network architecture - "attention" (Qtention), "cnn" (QCNN), hoặc "cnn_rnn" (QCnnRnn)
+        strategy: Training strategy - "Q" (DQN) hoặc "DoubleQ" (Double DQN), chỉ áp dụng cho cnn_rnn
     """
     # Hyperparameters
     # config = {
@@ -49,7 +51,7 @@ def main_train(headless: bool = False, checkpoint: str = None, net: str = "atten
         'gamma': 0.9,
         'epsilon_start': 0.4,    # Tăng exploration ban đầu để học cả 2 actions
         'epsilon_end': 0.05,     # Giữ một chút exploration
-        'epsilon_decay': 0.8,  # Decay chậm hơn: 0.3 -> 0.01 trong ~500 episodes
+        'epsilon_decay': 0.99,  # Decay chậm hơn: 0.3 -> 0.01 trong ~500 episodes
         'buffer_size': 500,
         'batch_size': 64,
         'target_update_freq': 20,
@@ -166,27 +168,49 @@ def main_train(headless: bool = False, checkpoint: str = None, net: str = "atten
             warmup_steps=config['warmup_steps']
         )
     elif net == 'cnn_rnn':
-        trainer = QCnnRnnTrainer(
-            env=env,
-            agent=agent,
-            lr=config['lr'],
-            gamma=config['gamma'],
-            epsilon_start=config['epsilon_start'],
-            epsilon_end=config['epsilon_end'],
-            epsilon_decay=config['epsilon_decay'],
-            buffer_size=config['buffer_size'],
-            batch_size=config['batch_size'],
-            target_update_freq=config['target_update_freq'],
-            train_freq=config['train_freq'],
-            num_planning=config['num_planning'],
-            use_planning=config['use_planning'],
-            warmup_steps=config['warmup_steps']
-        )
+        if strategy == "Q":
+            trainer = QCnnRnnTrainer(
+                env=env,
+                agent=agent,
+                lr=config['lr'],
+                gamma=config['gamma'],
+                epsilon_start=config['epsilon_start'],
+                epsilon_end=config['epsilon_end'],
+                epsilon_decay=config['epsilon_decay'],
+                buffer_size=config['buffer_size'],
+                batch_size=config['batch_size'],
+                target_update_freq=config['target_update_freq'],
+                train_freq=config['train_freq'],
+                num_planning=config['num_planning'],
+                use_planning=config['use_planning'],
+                warmup_steps=config['warmup_steps']
+            )
+        elif strategy == "DoubleQ":
+            trainer = DoubleQCnnRnnTrainer(
+                env=env,
+                agent=agent,
+                lr=config['lr'],
+                gamma=config['gamma'],
+                epsilon_start=config['epsilon_start'],
+                epsilon_end=config['epsilon_end'],
+                epsilon_decay=config['epsilon_decay'],
+                buffer_size=config['buffer_size'],
+                batch_size=config['batch_size'],
+                target_update_freq=config['target_update_freq'],
+                train_freq=config['train_freq'],
+                num_planning=config['num_planning'],
+                use_planning=config['use_planning'],
+                warmup_steps=config['warmup_steps']
+            )
+        else:
+            raise ValueError(f"Invalid strategy: {strategy}. Choose 'Q' or 'DoubleQ'")
     else:
-        raise ValueError(f"Invalid network type for trainer: {net}. Choose 'attention'")
+        raise ValueError(f"Invalid network type for trainer: {net}. Choose 'attention', 'cnn', or 'cnn_rnn'")
     
     print(f"✓ Trainer created on device: {trainer.device}")
     print(f"  Training mode: {'Planning' if config['use_planning'] else 'Standard DQN'}")
+    if net == 'cnn_rnn':
+        print(f"  Strategy: {strategy} ({'Double DQN' if strategy == 'DoubleQ' else 'DQN'})")
     
     # Load checkpoint if provided (load trước để có replay buffer từ checkpoint)
     if checkpoint:
@@ -241,8 +265,10 @@ if __name__ == '__main__':
                         help='Path to warmup buffer file to preload replay buffer')
     parser.add_argument('--net', type=str, default='attention', choices=['attention', 'cnn', 'cnn_rnn'],
                         help='Network architecture: attention (Qtention) or cnn (QCNN) or cnn_rnn (QCnnRnn) (default: attention)')
+    parser.add_argument('--strategy', type=str, default='Q', choices=['Q', 'DoubleQ'],
+                        help='Training strategy for cnn_rnn: Q (DQN) or DoubleQ (Double DQN) (default: Q)')
     args = parser.parse_args()
     
     # Nếu dùng --show thì headless=False (hiển thị), ngược lại headless=True (không hiển thị)
-    main_train(headless=not args.show, checkpoint=args.checkpoint, net=args.net, warmup_path=args.warmup_path)
+    main_train(headless=not args.show, checkpoint=args.checkpoint, net=args.net, warmup_path=args.warmup_path, strategy=args.strategy)
     # main_train(headless=False, net='cnn_rnn', warmup_path=r"C:\Users\User\Documents\code\rl-training-gold-miner\warmup_buffer_rnn.pkl", checkpoint=r'C:\Users\User\Documents\code\rl-training-gold-miner\checkpoints\cnn_rnn_ckpt.pt')
