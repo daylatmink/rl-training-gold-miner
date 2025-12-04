@@ -189,7 +189,7 @@ class QcnnTrainer:
         gamma: float = 1.0,
         epsilon_start: float = 0.5,  # Thấp hơn vì chỉ có 2 actions
         epsilon_end: float = 0.01,    # End sớm hơn
-        epsilon_decay: float = 0.99,  # Decay nhanh hơn, replay buffer đã giúp break correlation
+        epsilon_decay: float = 0.99,  # Decay nhanh hơn (cho Exponentially), replay buffer đã giúp break correlation
         buffer_size: int = 320,
         batch_size: int = 64,
         target_update_freq: int = 1000,
@@ -197,6 +197,8 @@ class QcnnTrainer:
         num_planning: int = 1,  # Số lần quét buffer (planning) hoặc số batches (standard)
         use_planning: bool = True,  # True: planning approach, False: standard DQN
         warmup_steps: int = 1000,  # Số steps warmup với random actions trước khi train
+        explore_strategy: str = 'Exponentially',  # 'Linearly' or 'Exponentially'
+        num_episodes: int = 1000,  # Tổng số episodes (dùng cho Linearly decay)
         device: str = 'cuda' if torch.cuda.is_available() else 'cpu'
     ):
         self.env = env
@@ -206,6 +208,7 @@ class QcnnTrainer:
         # Hyperparameters
         self.gamma = gamma
         self.epsilon = epsilon_start
+        self.epsilon_start = epsilon_start
         self.epsilon_end = epsilon_end
         self.epsilon_decay = epsilon_decay
         self.batch_size = batch_size
@@ -214,6 +217,8 @@ class QcnnTrainer:
         self.num_planning = num_planning
         self.use_planning = use_planning
         self.warmup_steps = warmup_steps
+        self.explore_strategy = explore_strategy
+        self.num_episodes = num_episodes
         
         # Target network
         self.target_agent = QCNN(
@@ -549,8 +554,12 @@ class QcnnTrainer:
             reward_buffer += reward
             state = next_state
         
-        # Decay epsilon
-        self.epsilon = max(self.epsilon_end, self.epsilon * self.epsilon_decay)
+        # Decay epsilon (sử dụng self.num_episodes từ train loop)
+        if hasattr(self, '_current_episode') and self.explore_strategy == 'Linearly':
+            self.epsilon = max(self.epsilon_end, 
+                              self.epsilon_start - (self.epsilon_start - self.epsilon_end) * (self._current_episode / self.num_episodes))
+        else:  # Exponentially (default)
+            self.epsilon = max(self.epsilon_end, self.epsilon * self.epsilon_decay)
         
         return episode_reward, episode_steps
     
@@ -589,6 +598,9 @@ class QcnnTrainer:
         
         for episode in range(1, num_episodes + 1):
             self.log(f"\nStarting Episode {episode}/{num_episodes}")
+            
+            # Set current episode for linear decay
+            self._current_episode = episode
             
             # Train episode
             episode_reward, episode_steps = self.train_episode()

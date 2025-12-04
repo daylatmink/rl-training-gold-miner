@@ -12,7 +12,7 @@ from trainer.QtentionTrainer import QtentionTrainer
 from trainer.QcnnTrainer import QcnnTrainer
 
 
-def main_train(headless: bool = False, checkpoint: str = None, net: str = "attention", warmup_path: str = None, strategy: str = "Q"):
+def main_train(headless: bool = False, checkpoint: str = None, net: str = "attention", warmup_path: str = None, strategy: str = "Q", explore_strategy: str = "Exponentially"):
     """
     Main training function
     
@@ -49,9 +49,9 @@ def main_train(headless: bool = False, checkpoint: str = None, net: str = "atten
         'num_episodes': 1000,
         'lr': 3e-4,
         'gamma': 0.9,
-        'epsilon_start': 0.4,    # Tăng exploration ban đầu để học cả 2 actions
-        'epsilon_end': 0.05,     # Giữ một chút exploration
-        'epsilon_decay': 0.99,  # Decay chậm hơn: 0.3 -> 0.01 trong ~500 episodes
+        'epsilon_start': 0.6,    # Tăng exploration ban đầu để học cả 2 actions
+        'epsilon_end': 0.1,     # Giữ một chút exploration
+        'epsilon_decay': 0.0000333,  # Decay chậm hơn: 0.3 -> 0.01 trong ~500 episodes
         'buffer_size': 500,
         'batch_size': 64,
         'target_update_freq': 20,
@@ -267,8 +267,10 @@ if __name__ == '__main__':
                         help='Network architecture: attention (Qtention) or cnn (QCNN) or cnn_rnn (QCnnRnn) (default: attention)')
     parser.add_argument('--strategy', type=str, default='Q', choices=['Q', 'DoubleQ'],
                         help='Training strategy for cnn_rnn: Q (DQN) or DoubleQ (Double DQN) (default: Q)')
+    parser.add_argument('--explore-strategy', type=str, default='Exponentially', choices=['Linearly', 'Exponentially'],
+                        help='Epsilon decay strategy: Linearly or Exponentially (default: Exponentially)')
     args = parser.parse_args()
     
     # Nếu dùng --show thì headless=False (hiển thị), ngược lại headless=True (không hiển thị)
-    main_train(headless=not args.show, checkpoint=args.checkpoint, net=args.net, warmup_path=args.warmup_path, strategy=args.strategy)
+    main_train(headless=not args.show, checkpoint=args.checkpoint, net=args.net, warmup_path=args.warmup_path, strategy=args.strategy, explore_strategy=args.explore_strategy)
     # main_train(headless=False, net='cnn_rnn', warmup_path=r"C:\Users\User\Documents\code\rl-training-gold-miner\warmup_buffer_rnn.pkl", checkpoint=r'C:\Users\User\Documents\code\rl-training-gold-miner\checkpoints\cnn_rnn_ckpt.pt')
