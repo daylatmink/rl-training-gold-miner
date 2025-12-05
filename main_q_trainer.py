@@ -46,17 +46,17 @@ def main_train(headless: bool = False, checkpoint: str = None, net: str = "atten
     # }
     
     config = {
-        'num_episodes': 1000,
+        'num_episodes': 500,
         'lr': 3e-4,
         'gamma': 0.9,
-        'epsilon_start': 0.6,    # Tăng exploration ban đầu để học cả 2 actions
+        'epsilon_start': 0.5,    # Tăng exploration ban đầu để học cả 2 actions
         'epsilon_end': 0.1,     # Giữ một chút exploration
         'epsilon_decay': 0.0000333,  # Decay chậm hơn: 0.3 -> 0.01 trong ~500 episodes
         'buffer_size': 500,
         'batch_size': 64,
         'target_update_freq': 20,
         'train_freq': 1,         # Train mỗi 1 step (tăng overhead, giảm tốc độ)
-        'num_planning': 2,       # Số lần quét buffer (planning) hoặc số batches (standard)
+        'num_planning': 4,       # Số lần quét buffer (planning) hoặc số batches (standard)
         'use_planning': False,    # True: planning approach, False: standard DQN
         'warmup_steps': 500,    # Số steps warmup với random actions trước khi train
         'save_freq': 100,
@@ -64,6 +64,7 @@ def main_train(headless: bool = False, checkpoint: str = None, net: str = "atten
         'eval_episodes': 5,      # Chỉ 5 episodes cho mỗi lần eval (nhanh hơn)
         'levels': list(range(1, 11)),      # List các levels, mỗi episode sẽ sample ngẫu nhiên
         'headless': headless,     # Headless mode
+        'top_k': 10
     }
     
     print("="*60)
@@ -82,7 +83,7 @@ def main_train(headless: bool = False, checkpoint: str = None, net: str = "atten
         render_mode=render_mode,  # None = headless (không mở cửa sổ), 'human' = hiển thị
         max_steps=3600,        # 60 giây * 60 FPS
         levels=config['levels'],  # List các levels để sample ngẫu nhiên
-        use_generated_levels=True,
+        use_generated_levels=False,
         c_dyna=10,       # Cost của dynamite
         c_step=0.0,        # Step cost (0 = không dùng)
         c_pull=0,        # Penalty khi đang kéo (0 = không dùng)
@@ -200,7 +201,9 @@ def main_train(headless: bool = False, checkpoint: str = None, net: str = "atten
                 train_freq=config['train_freq'],
                 num_planning=config['num_planning'],
                 use_planning=config['use_planning'],
-                warmup_steps=config['warmup_steps']
+                warmup_steps=config['warmup_steps'],
+                explore_strategy=explore_strategy,
+                top_k=config['top_k']
             )
         else:
             raise ValueError(f"Invalid strategy: {strategy}. Choose 'Q' or 'DoubleQ'")
@@ -273,4 +276,4 @@ if __name__ == '__main__':
     
     # Nếu dùng --show thì headless=False (hiển thị), ngược lại headless=True (không hiển thị)
     main_train(headless=not args.show, checkpoint=args.checkpoint, net=args.net, warmup_path=args.warmup_path, strategy=args.strategy, explore_strategy=args.explore_strategy)
-    # main_train(headless=False, net='cnn_rnn', warmup_path=r"C:\Users\User\Documents\code\rl-training-gold-miner\warmup_buffer_rnn.pkl", checkpoint=r'C:\Users\User\Documents\code\rl-training-gold-miner\checkpoints\cnn_rnn_ckpt.pt')
+    # main_train(headless=False, net='cnn_rnn', warmup_path=r"C:\Users\User\Documents\code\rl-training-gold-miner\warmup_buffer_rnn.pkl", checkpoint=None, strategy='DoubleQ', explore_strategy='Linearly')

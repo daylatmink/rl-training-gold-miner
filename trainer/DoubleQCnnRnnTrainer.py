@@ -212,6 +212,7 @@ class DoubleQCnnRnnTrainer:
         warmup_steps: int = 1000,  # Số steps warmup với random actions trước khi train
         explore_strategy: str = 'Exponentially',  # 'Linearly' or 'Exponentially'
         num_episodes: int = 1000,  # Tổng số episodes (dùng cho Linearly decay)
+        top_k: int = -1,  # Số actions để sample khi chọn (-1 = argmax trên toàn bộ)
         device: str = 'cuda' if torch.cuda.is_available() else 'cpu'
     ):
         self.env = env
@@ -232,6 +233,7 @@ class DoubleQCnnRnnTrainer:
         self.warmup_steps = warmup_steps
         self.explore_strategy = explore_strategy
         self.num_episodes = num_episodes
+        self.top_k = top_k
         
         # Target network
         self.target_agent = QCnnRnn(
@@ -336,8 +338,20 @@ class DoubleQCnnRnnTrainer:
             q_value = None
         else:
             with torch.no_grad():
-                action = q_values.argmax(dim=1).item()
-                q_value = q_values[0][action].cpu().item()
+                # Top-k sampling: chỉ xét k actions được sample random (chỉ khi training)
+                if training and self.top_k > 0 and self.top_k < self.agent.n_actions:
+                    # Sample k actions ngẫu nhiên
+                    action_candidates = random.sample(range(self.agent.n_actions), self.top_k)
+                    # Lấy q-values của k actions này
+                    q_values_subset = q_values[0][action_candidates]
+                    # Argmax trên k actions
+                    best_idx = q_values_subset.argmax().item()
+                    action = action_candidates[best_idx]
+                    q_value = q_values_subset[best_idx].cpu().item()
+                else:
+                    # Argmax trên toàn bộ actions (behavior mặc định hoặc khi eval)
+                    action = q_values.argmax(dim=1).item()
+                    q_value = q_values[0][action].cpu().item()
             used_model = True
         
         # Lưu thông tin action vào global state để hiển thị trên màn hình
