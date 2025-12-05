@@ -59,7 +59,7 @@ def main_train(headless: bool = False, checkpoint: str = None, net: str = "atten
         'num_planning': 4,       # Số lần quét buffer (planning) hoặc số batches (standard)
         'use_planning': False,    # True: planning approach, False: standard DQN
         'warmup_steps': 100,    # Số steps warmup với random actions trước khi train
-        'save_freq': 100,
+        'save_freq': 20,
         'eval_freq': 500,         # Evaluate mỗi 50 episodes thay vì 200
         'eval_episodes': 5,      # Chỉ 5 episodes cho mỗi lần eval (nhanh hơn)
         'levels': list(range(1, 11)),      # List các levels, mỗi episode sẽ sample ngẫu nhiên

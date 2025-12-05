@@ -11,7 +11,7 @@ import datetime
 from .level_generator import LevelGenerator, ProceduralLevelManager
 # KHỞI TẠO LEVEL MANAGER (thêm vào sau imports)
 level_generator = LevelGenerator()
-level_manager = ProceduralLevelManager(level_generator)
+level_manager = ProceduralLevelManager()
 
 # Kiểm tra va chạm giữa dây và item
 def is_collision(rope, item):

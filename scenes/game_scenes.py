@@ -323,14 +323,11 @@ class GameScene(Scene):
     def _get_generated_level_id(self):
         """Tạo hoặc lấy level_id cho generated levels"""
         try:
-            # Dựa trên level number để xác định difficulty
-            # level=0 → "train", level=1 → "easy", level=2 → "medium", level=3 → "hard", level=4+ → "expert"
-            if self.level == 0:
-                difficulty = "train"
-            else:
-                difficulties = ["easy", "medium", "hard", "expert"]
-                difficulty_index = max(0, min(self.level - 1, len(difficulties) - 1))
-                difficulty = difficulties[difficulty_index]
+            # Dựa trên level number để xác định difficulty (1-10)
+            # level 0 → difficulty 1 (easiest)
+            # level 1-10 → difficulty 1-10
+            # level 11+ → difficulty 10 (hardest)
+            difficulty = min(max(1, self.level), 10)
             
             # Tạo level_id unique
             level_id = f"GEN_L{self.level}_{random.randint(1000, 9999)}"
