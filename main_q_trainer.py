@@ -83,7 +83,7 @@ def main_train(headless: bool = False, checkpoint: str = None, net: str = "atten
         render_mode=render_mode,  # None = headless (không mở cửa sổ), 'human' = hiển thị
         max_steps=3600,        # 60 giây * 60 FPS
         levels=config['levels'],  # List các levels để sample ngẫu nhiên
-        use_generated_levels=False,
+        use_generated_levels=True,
         c_dyna=10,       # Cost của dynamite
         c_step=0.0,        # Step cost (0 = không dùng)
         c_pull=0,        # Penalty khi đang kéo (0 = không dùng)

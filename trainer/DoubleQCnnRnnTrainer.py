@@ -267,9 +267,12 @@ class DoubleQCnnRnnTrainer:
         with open(warmup_path, 'rb') as f:
             buffer_data = pickle.load(f)
             
-            
             for epi in buffer_data:
-                self.replay_buffer.push(epi['env_feats'], epi['item_feats'], epi['masks'], epi['actions'], epi['rewards'], epi['seq_len'])
+                if isinstance(epi, dict):
+                    self.replay_buffer.push(epi['env_feats'], epi['item_feats'], epi['masks'], epi['actions'], epi['rewards'], epi['seq_len'])
+                else:
+                    self.replay_buffer.push(epi[0], epi[1], epi[2], epi[3], epi[4], epi[5])
+            
             
         print(f"✓ Warmup buffer loaded")
         print(f"  Loaded {len(buffer_data)} transitions")
