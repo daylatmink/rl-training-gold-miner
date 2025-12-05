@@ -46,7 +46,7 @@ def main_train(headless: bool = False, checkpoint: str = None, net: str = "atten
     # }
     
     config = {
-        'num_episodes': 500,
+        'num_episodes': 1000,
         'lr': 3e-4,
         'gamma': 0.9,
         'epsilon_start': 0.5,    # Tăng exploration ban đầu để học cả 2 actions
@@ -58,7 +58,7 @@ def main_train(headless: bool = False, checkpoint: str = None, net: str = "atten
         'train_freq': 1,         # Train mỗi 1 step (tăng overhead, giảm tốc độ)
         'num_planning': 4,       # Số lần quét buffer (planning) hoặc số batches (standard)
         'use_planning': False,    # True: planning approach, False: standard DQN
-        'warmup_steps': 500,    # Số steps warmup với random actions trước khi train
+        'warmup_steps': 100,    # Số steps warmup với random actions trước khi train
         'save_freq': 100,
         'eval_freq': 500,         # Evaluate mỗi 50 episodes thay vì 200
         'eval_episodes': 5,      # Chỉ 5 episodes cho mỗi lần eval (nhanh hơn)

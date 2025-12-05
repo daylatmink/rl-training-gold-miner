@@ -77,7 +77,12 @@ class Rope:
                 self.x2 = self.x1 + self.length * math.cos(math.radians(self.direction))
                 self.y2 = self.y1 + self.length * math.sin(math.radians(self.direction))
                 if(self.item != None): # nếu đụng trúng vật phẩm
-                    self.weight = int(self.item.size/30)
+                    # Tăng weight cho đá (rock nặng hơn, mất nhiều thời gian kéo lên hơn)
+                    base_weight = int(self.item.size/30)
+                    if hasattr(self.item, 'rock_image'):  # Nếu là Rock
+                        self.weight = base_weight * 3  # Đá nặng gấp ba
+                    else:
+                        self.weight = base_weight
                     self.item.draw(dt,screen)
                     if (self.direction < 90):
                         new_x2 = self.x2

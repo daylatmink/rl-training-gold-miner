@@ -21,19 +21,19 @@ class LevelGenerator:
     ENTITY_CONFIG = {
         # === ROCKS - CHƯỚNG NGẠI VẬT ===
         "MiniRock": {
-            "weight": 5,           # Đá nhỏ phổ biến
+            "weight": 8,           # Tăng: đá nhỏ xuất hiện nhiều hơn
             "size": 30,            # Kích thước ước tính
             "value": 0,
             "categories": ["rock", "mini"]
         },
         "NormalRock": {
-            "weight": 8,           # Đá vừa xuất hiện nhiều nhất
+            "weight": 12,          # Tăng: đá vừa xuất hiện rất nhiều
             "size": 45,
             "value": 0,
             "categories": ["rock", "normal"]
         },
         "BigRock": {
-            "weight": 2,           # Đá lớn ít hơn
+            "weight": 5,           # Tăng: đá lớn xuất hiện nhiều hơn
             "size": 60,
             "value": 0,
             "categories": ["rock", "big"]
@@ -41,19 +41,19 @@ class LevelGenerator:
         
         # === GOLD - VẬT PHẨM GIÁ TRỊ ===
         "MiniGold": {
-            "weight": 12,          # Vàng nhỏ rất phổ biến
+            "weight": 10,          # Giảm xuống để cân bằng với đá
             "size": 25,
             "value": 50,
             "categories": ["gold", "mini"]
         },
         "NormalGold": {
-            "weight": 10,          # Vàng vừa phổ biến
+            "weight": 8,           # Giảm xuống để cân bằng với đá
             "size": 35,
             "value": 250,
             "categories": ["gold", "normal"]
         },
         "BigGold": {
-            "weight": 6,           # Vàng lớn ít hơn nhưng vẫn khá
+            "weight": 5,           # Giảm xuống để cân bằng với đá
             "size": 50,
             "value": 500,
             "categories": ["gold", "big"]
@@ -98,8 +98,8 @@ class LevelGenerator:
     DIFFICULTY_CONFIG = {
         "easy": {
             "total_items": (8, 12),           # 8-12 items
-            "gold_ratio": (0.55, 0.70),       # 55-70% là vàng
-            "rock_ratio": (0.25, 0.35),       # 25-35% là đá
+            "gold_ratio": (0.40, 0.55),       # Giảm: 40-55% là vàng (trước 55-70%)
+            "rock_ratio": (0.35, 0.50),       # Tăng: 35-50% là đá (trước 25-35%)
             "special_ratio": (0.05, 0.12),    # 5-12% special (diamond, question)
             "obstacle_ratio": (0.0, 0.0),     # 0% obstacles
             "diamond_chance": 0.3,            # 30% có diamond
@@ -107,8 +107,8 @@ class LevelGenerator:
         },
         "medium": {
             "total_items": (10, 15),
-            "gold_ratio": (0.50, 0.65),
-            "rock_ratio": (0.30, 0.42),
+            "gold_ratio": (0.35, 0.50),       # Giảm: 35-50% là vàng (trước 50-65%)
+            "rock_ratio": (0.40, 0.55),       # Tăng: 40-55% là đá (trước 30-42%)
             "special_ratio": (0.08, 0.15),
             "obstacle_ratio": (0.0, 0.03),    # Tối đa 3% obstacles
             "diamond_chance": 0.5,            # 50% có diamond
@@ -116,8 +116,8 @@ class LevelGenerator:
         },
         "hard": {
             "total_items": (12, 18),
-            "gold_ratio": (0.45, 0.60),
-            "rock_ratio": (0.30, 0.45),
+            "gold_ratio": (0.30, 0.45),       # Giảm: 30-45% là vàng (trước 45-60%)
+            "rock_ratio": (0.40, 0.55),       # Tăng: 40-55% là đá (trước 30-45%)
             "special_ratio": (0.10, 0.18),
             "obstacle_ratio": (0.02, 0.08),   # 2-8% obstacles
             "diamond_chance": 0.7,            # 70% có diamond
