@@ -782,3 +782,52 @@ class QcnnTrainer:
         with open(path, 'w') as f:
             json.dump(log, f, indent=2)
         self.log(f"Saved training log: {path}")
+
+    def analyze_action_distribution(self, num_samples: int = 1000):
+        """
+        Debug helper: kiểm tra mạng có thực sự phân biệt state hay không
+        bằng cách thống kê phân bố argmax(Q(s, a)) trên một tập state
+        lấy từ replay buffer.
+
+        Args:
+            num_samples: số lượng transition tối đa lấy ra để phân tích
+        """
+        if len(self.replay_buffer) == 0:
+            print("Replay buffer is empty, nothing to analyze.")
+            return
+
+        # Lấy ngẫu nhiên tối đa num_samples transition từ buffer
+        buffer_list = list(self.replay_buffer.buffer)
+        n = min(num_samples, len(buffer_list))
+        transitions = random.sample(buffer_list, n)
+
+        # Unpack các tensor state từ transition
+        env_feats_list, item_feats_list, mask_list, actions, rewards, \
+            next_env_feats_list, next_item_feats_list, next_mask_list, dones = zip(*transitions)
+
+        env_feats = torch.stack(env_feats_list).to(self.device)          # [N, 10]
+        item_feats = torch.stack(item_feats_list).to(self.device)        # [N, max_items, 23]
+        mask = torch.stack(mask_list).to(self.device)                    # [N, max_items]
+
+        # Chạy forward qua mạng và lấy argmax
+        self.agent.eval()
+        with torch.no_grad():
+            q_values = self.agent(env_feats, item_feats, mask)           # [N, n_actions]
+            argmax_actions = q_values.argmax(dim=1).cpu().numpy()        # [N]
+
+        # Thống kê phân bố action
+        unique_actions, counts = np.unique(argmax_actions, return_counts=True)
+        print(f"\n[Analyze] Argmax(Q(s,a)) distribution over {n} sampled states:")
+        for a, c in zip(unique_actions, counts):
+            frac = c / n
+            print(f"  Action {int(a):2d}: {c:4d} samples ({frac:6.2%})")
+
+        # Một số thống kê phụ trợ
+        avg_q = q_values.mean().item()
+        max_q = q_values.max().item()
+        min_q = q_values.min().item()
+        print(f"[Analyze] Q statistics: avg={avg_q:.4f}, min={min_q:.4f}, max={max_q:.4f}")
+        print(f"[Analyze] Number of distinct argmax actions: {len(unique_actions)}/{self.agent.n_actions}")
+
+        # Trả agent về mode train như cũ
+        self.agent.train()

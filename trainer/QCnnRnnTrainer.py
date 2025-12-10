@@ -399,7 +399,7 @@ class QCnnRnnTrainer:
                 }
                 
                 loss = self._train_on_batch(batch)
-                iter_loss += loss.item()
+                iter_loss += loss
                 num_batches += 1
             
             # Tính avg loss cho lần quét này

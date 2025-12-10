@@ -16,178 +16,178 @@ class DataDrivenLevelGenerator:
     - L7-L10: avg 18-26 entities, lots of TNT/MoleWithDiamond, obstacles appear
     """
     
-    # Statistical entity distribution from levels.json analysis
+    # Statistical entity distribution from levels.json analysis (reduced counts)
     LEVEL_TEMPLATES = {
         'L1': {  # L1 group statistics
-            'total_items': (15, 16),
+            'total_items': (10, 12),
             'entities': {
-                'MiniGold': 4.3,      # avg count
-                'NormalGold': 3.0,
-                'BigGold': 1.7,
-                'MiniRock': 2.3,
-                'NormalRock': 2.3,
-                'QuestionBag': 1.3,
-                'Diamond': 0.3,       # 33% chance (1/3 levels)
-            }
-        },
-        'L2': {
-            'total_items': (20, 20),
-            'entities': {
-                'MiniGold': 7.0,
-                'NormalGold': 2.7,
-                'BigGold': 2.0,
-                'MiniRock': 3.0,
-                'NormalRock': 4.0,
+                'MiniGold': 3.0,
+                'NormalGold': 2.0,
+                'BigGold': 1.0,
+                'MiniRock': 1.5,
+                'NormalRock': 1.5,
                 'QuestionBag': 1.0,
                 'Diamond': 0.3,
             }
         },
-        'L3': {
-            'total_items': (16, 17),
+        'L2': {
+            'total_items': (12, 14),
             'entities': {
                 'MiniGold': 4.0,
-                'NormalGold': 3.0,
+                'NormalGold': 2.0,
                 'BigGold': 1.0,
-                'MiniRock': 3.0,
-                'NormalRock': 4.0,
-                'QuestionBag': 1.0,
-                'Diamond': 0.7,       # 67% chance
+                'MiniRock': 2.0,
+                'NormalRock': 2.5,
+                'QuestionBag': 0.5,
+                'Diamond': 0.3,
+            }
+        },
+        'L3': {
+            'total_items': (10, 12),
+            'entities': {
+                'MiniGold': 2.5,
+                'NormalGold': 2.0,
+                'BigGold': 0.5,
+                'MiniRock': 2.0,
+                'NormalRock': 2.5,
+                'QuestionBag': 0.5,
+                'Diamond': 0.5,
             }
         },
         'L4': {  # Mole introduced
-            'total_items': (16, 18),
+            'total_items': (10, 12),
             'entities': {
-                'MiniGold': 4.0,
-                'NormalGold': 1.7,
-                'NormalGoldPlus': 2.0,
-                'MiniRock': 1.0,
-                'NormalRock': 3.0,
-                'QuestionBag': 2.7,
-                'Mole': 3.0,         # 100% frequency
-            }
-        },
-        'L5': {
-            'total_items': (21, 21),
-            'entities': {
-                'MiniGold': 4.0,
-                'NormalGold': 3.0,
-                'NormalGoldPlus': 1.7,
-                'BigGold': 2.0,
-                'MiniRock': 1.0,
-                'NormalRock': 3.0,
-                'Diamond': 3.3,       # More diamonds
-                'QuestionBag': 1.0,
+                'MiniGold': 2.5,
+                'NormalGold': 1.0,
+                'NormalGoldPlus': 1.5,
+                'MiniRock': 0.5,
+                'NormalRock': 2.0,
+                'QuestionBag': 1.5,
                 'Mole': 2.0,
             }
         },
-        'L6': {  # MoleWithDiamond introduced
-            'total_items': (20, 22),
+        'L5': {
+            'total_items': (12, 14),
             'entities': {
-                'MiniGold': 7.0,
-                'NormalGold': 3.0,
+                'MiniGold': 2.5,
+                'NormalGold': 2.0,
+                'NormalGoldPlus': 1.0,
                 'BigGold': 1.0,
-                'MiniRock': 3.0,
-                'NormalRock': 3.0,
-                'QuestionBag': 1.0,
-                'MoleWithDiamond': 3.3,  # 100% frequency
+                'MiniRock': 0.5,
+                'NormalRock': 2.0,
+                'Diamond': 2.0,
+                'QuestionBag': 0.5,
+                'Mole': 1.0,
+            }
+        },
+        'L6': {  # MoleWithDiamond introduced
+            'total_items': (12, 14),
+            'entities': {
+                'MiniGold': 4.0,
+                'NormalGold': 2.0,
+                'BigGold': 0.5,
+                'MiniRock': 2.0,
+                'NormalRock': 2.0,
+                'QuestionBag': 0.5,
+                'MoleWithDiamond': 2.0,
             }
         },
         'L7': {  # TNT, Skull, Bone appear
-            'total_items': (18, 20),
+            'total_items': (11, 13),
             'entities': {
-                'MiniGold': 2.0,
-                'NormalGoldPlus': 2.0,
-                'BigGold': 3.0,
-                'QuestionBag': 1.0,
-                'Mole': 5.3,          # Lots of moles
-                'TNT': 2.0,           # 100% frequency
-                'Skull': 2.0,
-                'Bone': 2.0,
+                'MiniGold': 1.0,
+                'NormalGoldPlus': 1.0,
+                'BigGold': 2.0,
+                'QuestionBag': 0.5,
+                'Mole': 3.0,
+                'TNT': 1.5,
+                'Skull': 1.0,
+                'Bone': 1.0,
             }
         },
         'L8': {
-            'total_items': (17, 27),
+            'total_items': (10, 16),
             'variant': 'random',  # Two variants
             'variant_a': {  # Diamond + TNT heavy (clustered in middle)
                 'entities': {
-                    'Diamond': 7.0,
-                    'TNT': 5.0,
-                    'QuestionBag': 2.0,
-                    'MoleWithDiamond': 2.0,
+                    'Diamond': 4.0,
+                    'TNT': 3.0,
+                    'QuestionBag': 1.0,
+                    'MoleWithDiamond': 1.5,
                 },
                 'spawn_preference': 'middle_clustered'  # Spawn gần nhau ở middle
             },
             'variant_b': {  # BigGold + lots of Rocks
                 'entities': {
-                    'BigGold': 4.0,
-                    'MiniRock': 7.0,
-                    'NormalRock': 9.0,
-                    'Diamond': 4.0,
-                    'TNT': 2.0,
+                    'BigGold': 2.5,
+                    'MiniRock': 4.0,
+                    'NormalRock': 5.0,
+                    'Diamond': 2.5,
+                    'TNT': 1.5,
                 },
                 'spawn_preference': 'rocks_between_gold'  # Rocks giữa các BigGold
             }
         },
         'L9': {
-            'total_items': (12, 20),
+            'total_items': (8, 13),
             'variant': 'random',  # Three variants
             'variant_a': {  # 2 BigGold split screen + MoleWithDiamond + TNT
                 'entities': {
                     'BigGold': 2.0,
-                    'MoleWithDiamond': 4.0,  # 2 per half (total 4)
-                    'TNT': 6.0,              # Scattered top/bottom
-                    'Bone': 1.0,
-                    'QuestionBag': 1.0,
-                    'MiniGold': 1.0,
-                    'Diamond': 2.0,
+                    'MoleWithDiamond': 2.5,
+                    'TNT': 3.5,
+                    'Bone': 0.5,
+                    'QuestionBag': 0.5,
+                    'MiniGold': 0.5,
+                    'Diamond': 1.0,
                 },
                 'spawn_preference': 'split_screen_gold'  # 2 BigGold on left/right halves
             },
             'variant_b': {  # TNT + Moles scattered
                 'entities': {
-                    'TNT': 2.0,              # 1 TNT anywhere
-                    'Mole': 4.0,             # ~8 total moles (ratio 2:1 with MoleWithDiamond)
-                    'MoleWithDiamond': 4.0,
-                    'MiniGold': 2.0,
+                    'TNT': 1.5,
+                    'Mole': 2.5,
+                    'MoleWithDiamond': 2.5,
+                    'MiniGold': 1.0,
                 },
                 'spawn_preference': 'random_tnt_moles'  # TNT random, moles scattered
             },
             'variant_c': {  # Original L9 pattern (fallback)
                 'entities': {
-                    'MiniGold': 1.0,
-                    'BigGold': 2.0,
-                    'QuestionBag': 2.0,
-                    'MoleWithDiamond': 4.0,
-                    'TNT': 7.0,
-                    'Skull': 1.0,
-                    'Bone': 1.0,
+                    'MiniGold': 0.5,
+                    'BigGold': 1.0,
+                    'QuestionBag': 1.0,
+                    'MoleWithDiamond': 2.5,
+                    'TNT': 4.0,
+                    'Skull': 0.5,
+                    'Bone': 0.5,
                 },
                 'spawn_preference': None
             }
         },
         'L10': {  # Hardest levels
-            'total_items': (20, 26),
+            'total_items': (12, 16),
             'variant': 'random',  # Two variants
             'variant_a': {  # Lots of gold at bottom, lots of rocks at top
                 'entities': {
-                    'MiniGold': 6.0,         # Lots of gold at bottom
-                    'NormalGold': 5.0,
-                    'NormalGoldPlus': 5.0,
-                    'BigGold': 5.0,
-                    'MiniRock': 3.0,         # Rocks at top
-                    'NormalRock': 5.0,
+                    'MiniGold': 3.5,
+                    'NormalGold': 3.0,
+                    'NormalGoldPlus': 3.0,
+                    'BigGold': 3.0,
+                    'MiniRock': 2.0,
+                    'NormalRock': 3.0,
                 },
                 'spawn_preference': 'gold_bottom_rocks_top'
             },
             'variant_b': {  # Diamond + TNT + MoleWithDiamond heavy
                 'entities': {
-                    'BigGold': 3.0,          # Bottom
-                    'MoleWithDiamond': 4.0,  # Scattered
-                    'Diamond': 6.0,          # Interspersed with TNT
-                    'TNT': 6.0,              # Interspersed with Diamond
-                    'QuestionBag': 2.0,
-                    'Skull': 1.0,
-                    'Bone': 1.0,
+                    'BigGold': 1.5,
+                    'MoleWithDiamond': 2.5,
+                    'Diamond': 3.5,
+                    'TNT': 3.5,
+                    'QuestionBag': 1.0,
+                    'Skull': 0.5,
+                    'Bone': 0.5,
                 },
                 'spawn_preference': 'diamond_tnt_interspersed'
             }
