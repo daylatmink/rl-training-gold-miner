@@ -270,18 +270,29 @@ def use_dynamite():
 ai_action_info = {
     'action': None,
     'q_value': None,
-    'used_model': False
+    'used_model': False,
+    'mode': 'model'  # 'model', 'random', 'selective_random'
 }
 
 def get_ai_action_info():
     return ai_action_info
 
-def set_ai_action_info(action, q_value, used_model):
+def set_ai_action_info(action, q_value, used_model, mode='model'):
+    """
+    Lưu thông tin action để hiển thị.
+    
+    Args:
+        action: Action index
+        q_value: Q-value của action
+        used_model: True nếu dùng model
+        mode: 'model' (greedy), 'random' (epsilon/warmup), 'selective_random' (sau khi miss)
+    """
     global ai_action_info
     ai_action_info = {
         'action': action,
         'q_value': q_value,
-        'used_model': used_model
+        'used_model': used_model,
+        'mode': mode
     }
 
 # Game speed management

@@ -297,7 +297,7 @@ class QCnnRnnTrainer:
         self.target_agent.load_state_dict(self.agent.state_dict())
     
     @torch.no_grad()
-    def select_action(self, state: dict, prev_action: int, miss_streak: int, hidden_state: torch.Tensor, training: bool = True) -> tuple:
+    def select_action(self, state: dict, prev_action: int, miss_streak: int, hidden_state: torch.Tensor, training: bool = True, k_random: int = 5) -> tuple:
         """
         Chọn action với epsilon-greedy policy
         
@@ -305,6 +305,7 @@ class QCnnRnnTrainer:
             state: Game state dict
             miss_streak: Số lần miss liên tiếp
             training: Nếu True thì dùng epsilon-greedy, False thì greedy
+            k_random: Số actions random để chọn max khi miss (default: 10)
             
         Returns:
             (action, used_model, new_hidden_state): action được chọn và flag cho biết có dùng model không
@@ -323,19 +324,35 @@ class QCnnRnnTrainer:
             action = random.randint(0, self.agent.n_actions - 1)
             used_model = False
             q_value = None
+            action_mode = 'random'
         # Epsilon-greedy action selection
         elif training and random.random() < self.epsilon:
             action = random.randint(0, self.agent.n_actions - 1)
             used_model = False
             q_value = None
+            action_mode = 'random'
+        # Sau khi kéo hụt: random k actions và chọn max trong k đó
+        elif miss_streak > 0:
+            with torch.no_grad():
+                # Random k action indices
+                random_actions = random.sample(range(self.agent.n_actions), min(k_random, self.agent.n_actions))
+                # Lấy Q-values của các actions đó
+                random_q_values = q_values[0, random_actions]
+                # Chọn action có Q-value cao nhất trong k actions
+                best_idx = random_q_values.argmax().item()
+                action = random_actions[best_idx]
+                q_value = random_q_values[best_idx].cpu().item()
+            used_model = True
+            action_mode = 'selective_random'
         else:
             with torch.no_grad():
                 action = q_values.argmax(dim=1).item()
                 q_value = q_values[0][action].cpu().item()
             used_model = True
+            action_mode = 'model'
         
         # Lưu thông tin action vào global state để hiển thị trên màn hình
-        set_ai_action_info(action, q_value, used_model)
+        set_ai_action_info(action, q_value, used_model, action_mode)
         
         return action, used_model, new_hidden_state
     

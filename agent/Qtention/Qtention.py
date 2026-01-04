@@ -4,7 +4,7 @@ from agent.Qtention.Embedder import Embedder
 
 class Qtention(nn.Module):
 
-    def __init__(self, d_model=20, d_ff=24, nhead=4, n_layers=2, dropout=0.0, max_items=30, n_actions=2):
+    def __init__(self, d_model=20, d_ff=24, nhead=4, n_layers=2, dropout=0.0, max_items=30, n_actions=50):
         super().__init__()
         assert d_model % nhead == 0, "d_model phải chia hết cho nhead"
         self.d_model = d_model

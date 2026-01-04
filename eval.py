@@ -34,8 +34,8 @@ def evaluate_agent_with_render(checkpoint_path: str, num_episodes: int = 5, fps:
     env = GoldMinerEnv(
         render_mode='human',  # Hiển thị game
         max_steps=3600,       # 60 giây * 60 FPS
-        levels=1,
-        use_generated_levels=False,
+        levels=7,
+        use_generated_levels=True,
         c_dyna=10,
         c_step=0.0,
         c_pull=0.0,
@@ -49,11 +49,11 @@ def evaluate_agent_with_render(checkpoint_path: str, num_episodes: int = 5, fps:
     
     if net == "attention":
         agent = Qtention(
-            d_model=20,
+            d_model=32,
             n_actions=50,
-            nhead=4,
-            n_layers=3,
-            d_ff=24,
+            nhead=8,
+            n_layers=6,
+            d_ff=48,
             dropout=0.1,
             max_items=30
         )
@@ -190,13 +190,13 @@ def evaluate_agent_with_render(checkpoint_path: str, num_episodes: int = 5, fps:
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Evaluate trained DQN agent for Gold Miner')
-    parser.add_argument('--checkpoint', type=str, default='C:\\Users\\User\\Documents\\code\\rl-training-gold-miner\\checkpoints\\goat.pt',
+    parser.add_argument('--checkpoint', type=str, default='C:\\Users\\User\\Documents\\code\\rl-training-gold-miner\\checkpoints\\qtention\\checkpoint_cycle_2000.pth',
                         help='Path to checkpoint file (default: None)')
-    parser.add_argument('--episodes', type=int, default=5,
-                        help='Number of episodes to play (default: 5)')
+    parser.add_argument('--episodes', type=int, default=3,
+                        help='Number of episodes to play (default: 3)')
     parser.add_argument('--fps', type=int, default=60,
                         help='FPS limit (default: 60)')
-    parser.add_argument('--net', type=str, default='cnn_rnn', choices=['attention', 'cnn', 'cnn_rnn'],
+    parser.add_argument('--net', type=str, default='attention', choices=['attention', 'cnn', 'cnn_rnn'],
                         help='Network architecture: "attention" (Qtention), "cnn" (QCNN), or "cnn_rnn" (QCnnRnn) (default: attention)')
     
     args = parser.parse_args()

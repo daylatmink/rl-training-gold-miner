@@ -409,7 +409,16 @@ class GameScene(Scene):
         from define import get_ai_action_info
         ai_info = get_ai_action_info()
         if ai_info['action'] is not None:
-            action_text = f"{'Model' if ai_info['used_model'] else 'Random'} action: {ai_info['action']}"
+            # Xác định loại action dựa trên mode
+            mode = ai_info.get('mode', 'model')
+            if mode == 'selective_random':
+                action_label = 'Selective Random'
+            elif mode == 'random':
+                action_label = 'Random'
+            else:
+                action_label = 'Model'
+            
+            action_text = f"{action_label} action: {ai_info['action']}"
             if ai_info['q_value'] is not None:
                 action_text += f" with Q-values: {ai_info['q_value']:.6e}"
             screen.blit(debug_font.render(action_text, True, (0, 100, 255)), (10, 180))

@@ -327,7 +327,7 @@ class QtentionTrainer:
         self.loss_fn = nn.MSELoss()
         
         # Replay buffer
-        self.replay_buffer = ReplayBuffer(buffer_size, device=device)
+        self.replay_buffer = ReplayBuffer(buffer_size)
         
         # Tracking
         self.total_steps = 0
@@ -367,13 +367,15 @@ class QtentionTrainer:
         """Copy weights từ agent sang target_agent"""
         self.target_agent.load_state_dict(self.agent.state_dict())
     
-    def select_action(self, state: dict, training: bool = True) -> tuple:
+    def select_action(self, state: dict, miss_streak: int = 0, training: bool = True, k_random: int = 5) -> tuple:
         """
         Chọn action với epsilon-greedy policy
         
         Args:
             state: Game state dict
+            miss_streak: Số lần miss liên tiếp
             training: Nếu True thì dùng epsilon-greedy, False thì greedy
+            k_random: Số actions random để chọn max khi miss (default: 5)
             
         Returns:
             (action, used_model): action được chọn và flag cho biết có dùng model không
@@ -382,26 +384,42 @@ class QtentionTrainer:
         type_ids, item_feats, mov_idx, mov_feats = Embedder.preprocess_state(state)
         
         # Convert to torch tensors và chuyển sang device
-        type_ids_t =type_ids.unsqueeze(0).to(self.device)  # [1, L]
-        item_feats_t =item_feats.unsqueeze(0).to(self.device)  # [1, L, d_feats]
-        mov_idx_t =mov_idx.unsqueeze(0).to(self.device) if len(mov_idx) > 0 else None
-        mov_feats_t =mov_feats.unsqueeze(0).to(self.device) if len(mov_feats) > 0 else None
+        type_ids_t = type_ids.unsqueeze(0).to(self.device)  # [1, L]
+        item_feats_t = item_feats.unsqueeze(0).to(self.device)  # [1, L, d_feats]
+        mov_idx_t = mov_idx.unsqueeze(0).to(self.device) if len(mov_idx) > 0 else None
+        mov_feats_t = mov_feats.unsqueeze(0).to(self.device) if len(mov_feats) > 0 else None
         
-        # Epsilon-greedy action selection
-        if training and random.random() < self.epsilon:
+        # Sau khi kéo hụt: random k actions và chọn max trong k đó (ưu tiên hơn epsilon-greedy)
+        if miss_streak > 0:
+            with torch.no_grad():
+                q_values = self.agent(type_ids_t, item_feats_t, mov_idx_t, mov_feats_t)  # [1, n_actions]
+                # Random k action indices
+                random_actions = random.sample(range(self.agent.n_actions), min(k_random, self.agent.n_actions))
+                # Lấy Q-values của các actions đó
+                random_q_values = q_values[0, random_actions]
+                # Chọn action có Q-value cao nhất trong k actions
+                best_idx = random_q_values.argmax().item()
+                action = random_actions[best_idx]
+                q_value = random_q_values[best_idx].cpu().item()
+            used_model = True
+            action_mode = 'selective_random'
+        # Epsilon-greedy action selection (chỉ khi miss_streak == 0)
+        elif training and random.random() < self.epsilon:
             action = random.randint(0, self.agent.n_actions - 1)
             used_model = False
             q_value = None
+            action_mode = 'random'
         else:
             with torch.no_grad():
                 q_values = self.agent(type_ids_t, item_feats_t, mov_idx_t, mov_feats_t)  # [1, n_actions]
                 action = q_values.argmax(dim=1).item()
                 q_value = q_values[0][action].cpu().item()
             used_model = True
+            action_mode = 'model'
         
         # Lưu thông tin action vào global state để hiển thị trên màn hình
         from define import set_ai_action_info
-        set_ai_action_info(action, q_value, used_model)
+        set_ai_action_info(action, q_value, used_model, action_mode)
         
         return action, used_model
     
@@ -556,6 +574,8 @@ class QtentionTrainer:
         angle_decision = None
         done = False
         prev_total_points = 0.0  # Track tổng point để detect TNT
+        miss_streak = 0  # Số lần miss liên tiếp
+        prev_num_items = -1  # Số items trước đó để detect miss
         
         def update_replay_buffer():
             nonlocal action_buffer, reward_buffer, episode_reward, episode_steps, prev_total_points
@@ -601,9 +621,17 @@ class QtentionTrainer:
                 if angle_decision is None or done:
                     if state_buffer is not None:     
                         new_state_buffer = update_replay_buffer()
+                        
+                        # Track miss_streak
+                        cur_num_items = len(state['items'])
+                        if cur_num_items == prev_num_items:
+                            miss_streak += 1
+                        else:
+                            miss_streak = 0
+                        prev_num_items = cur_num_items
                     if done:
                         break
-                    action_buffer, used_model = self.select_action(state, training=True)
+                    action_buffer, used_model = self.select_action(state, miss_streak=miss_streak, training=True)
                     angle_decision = angle_bins[action_buffer]
                     state_buffer = new_state_buffer if state_buffer is not None else Embedder.preprocess_state(state)
                 
@@ -731,6 +759,8 @@ class QtentionTrainer:
             angle_decision = None
             done = False
             prev_total_points = 0.0  # Track tổng point để detect TNT
+            miss_streak = 0  # Số lần miss liên tiếp
+            prev_num_items = -1  # Số items trước đó để detect miss
             
             while True:
                 if not done and (state['rope_state']['state'] in ['expanding', 'retracting'] or state['rope_state']['timer'] > 0):
@@ -746,13 +776,21 @@ class QtentionTrainer:
                                 reward_buffer += tnt_penalty
                             prev_total_points = cur_total_points
                             
+                            # Track miss_streak
+                            cur_num_items = len(state['items'])
+                            if cur_num_items == prev_num_items:
+                                miss_streak += 1
+                            else:
+                                miss_streak = 0
+                            prev_num_items = cur_num_items
+                            
                             episode_reward += reward_buffer
                             episode_steps += 1
                             reward_buffer = 0
                             action_buffer = None
                         if done:
                             break
-                        action_buffer, used_model = self.select_action(state, training=False)  # Greedy
+                        action_buffer, used_model = self.select_action(state, miss_streak=miss_streak, training=False)  # Greedy
                         angle_decision = angle_bins[action_buffer]
                     
                     current_angle = state['rope_state']['direction']
@@ -790,10 +828,10 @@ class QtentionTrainer:
         self.agent.load_state_dict(checkpoint['agent_state_dict'])
         self.target_agent.load_state_dict(checkpoint['target_agent_state_dict'])
         self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-        self.epsilon = checkpoint['epsilon']
-        self.total_steps = checkpoint['total_steps']
-        self.episode_rewards = checkpoint['episode_rewards']
-        self.episode_lengths = checkpoint['episode_lengths']
+        self.epsilon = checkpoint.get('epsilon', self.epsilon)
+        self.total_steps = checkpoint.get('total_steps', 0)
+        self.episode_rewards = checkpoint.get('episode_rewards', [])
+        self.episode_lengths = checkpoint.get('episode_lengths', [])
         
         # Load replay buffer nếu có
         if 'replay_buffer' in checkpoint:
