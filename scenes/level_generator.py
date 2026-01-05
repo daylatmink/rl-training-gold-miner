@@ -19,7 +19,7 @@ class DataDrivenLevelGenerator:
     # Statistical entity distribution from levels.json analysis (reduced counts)
     LEVEL_TEMPLATES = {
         'L1': {  # L1 group statistics
-            'total_items': (10, 12),
+            'total_items': (14, 16),
             'entities': {
                 'MiniGold': 3.0,
                 'NormalGold': 2.0,
@@ -31,11 +31,11 @@ class DataDrivenLevelGenerator:
             }
         },
         'L2': {
-            'total_items': (12, 14),
+            'total_items': (20, 21),
             'entities': {
                 'MiniGold': 4.0,
                 'NormalGold': 2.0,
-                'BigGold': 1.0,
+                'BigGold': 2.0,
                 'MiniRock': 2.0,
                 'NormalRock': 2.5,
                 'QuestionBag': 0.5,
@@ -43,7 +43,7 @@ class DataDrivenLevelGenerator:
             }
         },
         'L3': {
-            'total_items': (10, 12),
+            'total_items': (16, 19),
             'entities': {
                 'MiniGold': 2.5,
                 'NormalGold': 2.0,
@@ -55,7 +55,7 @@ class DataDrivenLevelGenerator:
             }
         },
         'L4': {  # Mole introduced
-            'total_items': (10, 12),
+            'total_items': (16, 18),
             'entities': {
                 'MiniGold': 2.5,
                 'NormalGold': 1.0,
@@ -67,7 +67,7 @@ class DataDrivenLevelGenerator:
             }
         },
         'L5': {
-            'total_items': (12, 14),
+            'total_items': (20, 21),
             'entities': {
                 'MiniGold': 2.5,
                 'NormalGold': 2.0,
@@ -81,7 +81,7 @@ class DataDrivenLevelGenerator:
             }
         },
         'L6': {  # MoleWithDiamond introduced
-            'total_items': (12, 14),
+            'total_items': (20, 22),
             'entities': {
                 'MiniGold': 4.0,
                 'NormalGold': 2.0,
@@ -93,20 +93,20 @@ class DataDrivenLevelGenerator:
             }
         },
         'L7': {  # TNT, Skull, Bone appear
-            'total_items': (11, 13),
+            'total_items': (20, 22),
             'entities': {
                 'MiniGold': 1.0,
                 'NormalGoldPlus': 1.0,
-                'BigGold': 2.0,
+                'BigGold': 1.5,
                 'QuestionBag': 0.5,
-                'Mole': 3.0,
-                'TNT': 1.5,
+                'Mole': 2.0,
+                'TNT': 2.0,
                 'Skull': 1.0,
                 'Bone': 1.0,
             }
         },
         'L8': {
-            'total_items': (10, 16),
+            'total_items': (18, 27),
             'variant': 'random',  # Two variants
             'variant_a': {  # Diamond + TNT heavy (clustered in middle)
                 'entities': {
@@ -129,7 +129,7 @@ class DataDrivenLevelGenerator:
             }
         },
         'L9': {
-            'total_items': (8, 13),
+            'total_items': (12, 26),
             'variant': 'random',  # Three variants
             'variant_a': {  # 2 BigGold split screen + MoleWithDiamond + TNT
                 'entities': {
@@ -166,7 +166,7 @@ class DataDrivenLevelGenerator:
             }
         },
         'L10': {  # Hardest levels
-            'total_items': (12, 16),
+            'total_items': (25, 26),
             'variant': 'random',  # Two variants
             'variant_a': {  # Lots of gold at bottom, lots of rocks at top
                 'entities': {
@@ -182,8 +182,8 @@ class DataDrivenLevelGenerator:
             'variant_b': {  # Diamond + TNT + MoleWithDiamond heavy
                 'entities': {
                     'BigGold': 1.5,
-                    'MoleWithDiamond': 2.5,
-                    'Diamond': 3.5,
+                    'MoleWithDiamond': 1.5,
+                    'Diamond': 1.5,
                     'TNT': 3.5,
                     'QuestionBag': 1.0,
                     'Skull': 0.5,
@@ -227,6 +227,10 @@ class DataDrivenLevelGenerator:
         
         template = self.LEVEL_TEMPLATES[template_key]
         
+        # Get target total items from template
+        total_items_range = template.get('total_items', (15, 20))
+        target_total = random.randint(total_items_range[0], total_items_range[1])
+        
         # Handle L8, L9, L10 variants
         if 'variant' in template:
             if template_key == 'L8':
@@ -243,18 +247,25 @@ class DataDrivenLevelGenerator:
         else:
             spawn_preference = None
         
+        # Calculate scale factor to match target_total
+        base_total = sum(template['entities'].values())
+        scale_factor = target_total / base_total if base_total > 0 else 1.0
+        
         # Generate entities
         entities = []
         positions = []  # Track occupied positions
         
         for entity_type, avg_count in template['entities'].items():
+            # Scale count to match target total
+            scaled_avg = avg_count * scale_factor
+            
             # Determine actual count (add variance)
-            if avg_count < 1:  # Low probability entities
-                count = 1 if random.random() < avg_count else 0
+            if scaled_avg < 1:  # Low probability entities
+                count = 1 if random.random() < scaled_avg else 0
             else:
                 # Add ±20% variance
-                variance = int(avg_count * 0.2) + 1
-                count = max(0, int(avg_count) + random.randint(-variance, variance))
+                variance = max(1, int(scaled_avg * 0.2))
+                count = max(0, int(scaled_avg) + random.randint(-variance, variance))
             
             # Generate entities
             for _ in range(count):

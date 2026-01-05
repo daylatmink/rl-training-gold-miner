@@ -142,7 +142,13 @@ class GoldMinerEnv(gym.Env):
         seed: Optional[int] = None,
         options: Optional[Dict[str, Any]] = None
     ) -> Tuple[np.ndarray, Dict[str, Any]]:
-        """Reset environment về trạng thái ban đầu"""
+        """Reset environment về trạng thái ban đầu
+        
+        Args:
+            seed: Random seed
+            options: Optional dict với:
+                - 'level_data': Custom level data dict để load trực tiếp
+        """
         super().reset(seed=seed)
         
         # Reset game state
@@ -153,20 +159,45 @@ class GoldMinerEnv(gym.Env):
         set_game_speed(self.game_speed)
         set_use_fixed_timestep(True)  # Enable fixed timestep cho RL training
         
-        # Sample random level từ list
-        self.current_level = random.choice(self.levels)
+        # Check for custom level from options
+        custom_level_data = options.get('level_data') if options else None
         
-        # Create new game scene
-        self.game_scene = GameScene(
-            level=self.current_level,
-            tnt=0,
-            speed=1,
-            is_clover=False,
-            is_gem=False,
-            is_rock=False,
-            use_generated=self.use_generated_levels,
-            time_limit=self.max_steps // 60  # Convert steps to seconds (60 FPS)
-        )
+        if custom_level_data:
+            # Load custom level
+            from scenes.util import level_manager
+            custom_level_id = f"CUSTOM_{random.randint(10000, 99999)}"
+            level_manager.level_cache[custom_level_id] = custom_level_data
+            
+            self.current_level = 1
+            self.game_scene = GameScene(
+                level=self.current_level,
+                tnt=0,
+                speed=1,
+                is_clover=False,
+                is_gem=False,
+                is_rock=False,
+                use_generated=False,
+                time_limit=self.max_steps // 60
+            )
+            # Override với custom level
+            from scenes.util import load_level
+            self.game_scene.bg, self.game_scene.items = load_level(custom_level_id)
+            self.game_scene.current_level_id = custom_level_id
+        else:
+            # Sample random level từ list
+            self.current_level = random.choice(self.levels)
+            
+            # Create new game scene
+            self.game_scene = GameScene(
+                level=self.current_level,
+                tnt=0,
+                speed=1,
+                is_clover=False,
+                is_gem=False,
+                is_rock=False,
+                use_generated=self.use_generated_levels,
+                time_limit=self.max_steps // 60  # Convert steps to seconds (60 FPS)
+            )
         
         self.steps = 0
         self.total_reward = 0

@@ -1,5 +1,10 @@
-import pygame
 import sys
+import os
+
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+import pygame
 from scenes.game_scenes import SceneMananger
 from define import reset_game_state 
 

@@ -3,6 +3,12 @@ Evaluation script để xem agent chơi Gold Miner
 Load checkpoint và render game với visualization (tận dụng DQNTrainer.evaluate)
 """
 
+import sys
+import os
+
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import torch
 import pygame
 import argparse
@@ -15,7 +21,7 @@ from trainer.QcnnTrainer import QcnnTrainer
 from trainer.QCnnRnnTrainer import QCnnRnnTrainer
 
 
-def evaluate_agent_with_render(checkpoint_path: str, num_episodes: int = 5, fps: int = 60, net: str = "attention"):
+def evaluate_agent_with_render(checkpoint_path: str, num_episodes: int = 5, fps: int = 60, net: str = "attention", seed: int = None):
     """
     Load agent từ checkpoint và chơi game với visualization
     Tận dụng DQNTrainer để có logic giống hệt training
@@ -24,6 +30,7 @@ def evaluate_agent_with_render(checkpoint_path: str, num_episodes: int = 5, fps:
         checkpoint_path: Path to checkpoint file
         num_episodes: Số episodes để chơi
         fps: Frames per second (giới hạn FPS)
+        seed: Random seed cho reproducibility (reset mỗi episode)
     """
     # Setup device
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -34,8 +41,8 @@ def evaluate_agent_with_render(checkpoint_path: str, num_episodes: int = 5, fps:
     env = GoldMinerEnv(
         render_mode='human',  # Hiển thị game
         max_steps=3600,       # 60 giây * 60 FPS
-        levels=7,
-        use_generated_levels=True,
+        levels=6,
+        use_generated_levels=False,
         c_dyna=10,
         c_step=0.0,
         c_pull=0.0,
@@ -146,6 +153,8 @@ def evaluate_agent_with_render(checkpoint_path: str, num_episodes: int = 5, fps:
     print("\n" + "="*60)
     print("Starting evaluation...")
     print(f"Playing {num_episodes} episodes with {fps} FPS limit")
+    if seed is not None:
+        print(f"Random seed: {seed} (reset each episode for reproducibility)")
     print("Press ESC or close window to stop")
     print("="*60 + "\n")
     
@@ -156,6 +165,11 @@ def evaluate_agent_with_render(checkpoint_path: str, num_episodes: int = 5, fps:
             print(f"\n{'='*60}")
             print(f"Episode {episode}/{num_episodes}")
             print('='*60)
+            
+            # Reset selective_rng với seed cố định cho mỗi episode
+            # Chỉ ảnh hưởng đến selective greedy, không ảnh hưởng level generation
+            if seed is not None:
+                trainer.set_selective_seed(seed)
             
             # Sử dụng evaluate() method từ trainer (chỉ 1 episode)
             avg_reward = trainer.evaluate(num_episodes=1)
@@ -192,12 +206,14 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Evaluate trained DQN agent for Gold Miner')
     parser.add_argument('--checkpoint', type=str, default='C:\\Users\\User\\Documents\\code\\rl-training-gold-miner\\checkpoints\\qtention\\checkpoint_cycle_2000.pth',
                         help='Path to checkpoint file (default: None)')
-    parser.add_argument('--episodes', type=int, default=3,
+    parser.add_argument('--episodes', type=int, default=5,
                         help='Number of episodes to play (default: 3)')
     parser.add_argument('--fps', type=int, default=60,
                         help='FPS limit (default: 60)')
     parser.add_argument('--net', type=str, default='attention', choices=['attention', 'cnn', 'cnn_rnn'],
                         help='Network architecture: "attention" (Qtention), "cnn" (QCNN), or "cnn_rnn" (QCnnRnn) (default: attention)')
+    parser.add_argument('--seed', type=int, default=None,
+                        help='Random seed for reproducibility (reset each episode, default: None)')
     
     args = parser.parse_args()
     
@@ -205,5 +221,6 @@ if __name__ == '__main__':
         checkpoint_path=args.checkpoint,
         num_episodes=args.episodes,
         fps=args.fps,
-        net=args.net
+        net=args.net,
+        seed=args.seed
     )

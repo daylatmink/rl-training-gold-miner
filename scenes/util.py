@@ -90,18 +90,49 @@ def load_items(items_data,is_clover=False,is_gem=False,is_rock=False):
         items.append(load_item(item,is_clover,is_gem,is_rock))
     return items
 def load_level(level, is_clover=False, is_gem=False, is_rock=False):
-    """Load level data - hỗ trợ cả original và generated levels"""
+    """Load level data - hỗ trợ cả original, generated, và custom levels"""
+    
+    # KIỂM TRA NẾU LÀ CUSTOM LEVEL (từ cache)
+    if level.startswith('CUSTOM_'):
+        try:
+            level_data = level_manager.level_cache.get(level)
+            if level_data:
+                # Load background
+                try:
+                    from define import backgrounds
+                    level_type = level_data.get('type', 'LevelA')
+                    bg_map = {'LevelA': 0, 'LevelB': 1, 'LevelC': 2, 'LevelD': 3}
+                    bg_index = bg_map.get(level_type, 0)
+                    bg = backgrounds[bg_index] if bg_index < len(backgrounds) else backgrounds[0]
+                except (ImportError, AttributeError):
+                    bg = None
+                
+                items = create_entities_from_data(level_data['entities'], is_clover, is_gem, is_rock)
+                return bg, items
+            else:
+                print(f"❌ LOAD_LEVEL: Custom level {level} not found in cache, using L1_1")
+                return load_level("L1_1", is_clover, is_gem, is_rock)
+        except Exception as e:
+            print(f"❌ LOAD_LEVEL: Error loading custom level {level}: {e}")
+            return load_level("L1_1", is_clover, is_gem, is_rock)
     
     # KIỂM TRA NẾU LÀ GENERATED LEVEL
-    if level.startswith('GEN_') or level.startswith('TRAIN_'):
+    if level.startswith('GEN_') or level.startswith('TRAIN_') or level.startswith('RANDOM_'):
         try:
             # 🎯 ÁNH XẠ DIFFICULTY DỰA TRÊN LEVEL
             if isinstance(level, int) and level == 0:
-                difficulty = "train"  # Level 0 = train difficulty
+                difficulty = 1  # Level 0 = difficulty 1
             elif level.startswith('TRAIN_'):
-                difficulty = "train"  # TRAIN_ prefix = train difficulty
+                difficulty = 1  # TRAIN_ prefix = difficulty 1
+            elif level.startswith('RANDOM_'):
+                # Extract level number from RANDOM_{level}_{random}
+                parts = level.split('_')
+                if len(parts) >= 2 and parts[1].isdigit():
+                    difficulty = min(max(1, int(parts[1])), 10)
+                else:
+                    difficulty = 5  # Default
             else:
-                difficulty = "medium"  # Mặc định
+                difficulty = 5  # Mặc định
             
             level_data = level_manager.get_level(level, difficulty)
             

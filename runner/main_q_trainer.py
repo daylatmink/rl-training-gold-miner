@@ -2,6 +2,12 @@
 Main script để train DQN agent cho Gold Miner
 """
 
+import sys
+import os
+
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from model.GoldMiner import GoldMinerEnv
 from agent.Qtention.Qtention import Qtention
 from agent.QCNN.QCNN import QCNN

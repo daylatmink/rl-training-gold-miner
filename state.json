@@ -1,22 +1,22 @@
 {
-  "timestamp": "2025-11-08T19:04:16.593040",
+  "timestamp": "2026-01-04T20:00:34.888182",
   "global_state": {
-    "score": 1000000,
-    "goal": 3125,
-    "level": 4,
-    "time_left": 53,
-    "pause": true,
-    "start_time": 10.450000000000001,
+    "score": 0,
+    "goal": 650,
+    "level": 1,
+    "time_left": 58,
+    "pause": false,
+    "start_time": 1.684,
     "dynamite_count": 0
   },
   "scene_state": {
-    "level_number": 4,
-    "current_level_id": "GEN_L4_2401",
+    "level_number": 1,
+    "current_level_id": "GEN_L1_3339",
     "use_generated": true,
     "play_explosive": false,
-    "pause": true,
-    "pause_time": 13.095,
-    "items_count": 22
+    "pause": false,
+    "pause_time": 0,
+    "items_count": 15
   },
   "miner_state": {
     "position": {
@@ -24,7 +24,7 @@
       "y": -7
     },
     "speed": 5,
-    "current_frame": 0.49500000000000005,
+    "current_frame": 0.42500000000000004,
     "state": 0,
     "state_name": "swinging",
     "is_play_done": false
@@ -35,14 +35,14 @@
       "y": 45
     },
     "end_position": {
-      "x": 627.1347671797454,
-      "y": 92.41618276030995
+      "x": 595.3141524625887,
+      "y": 60.035289975213665
     },
     "length": 50,
     "speed": 300,
     "buff_speed": 1,
     "weight": 1,
-    "direction": 108.50000000000006,
+    "direction": 162.5,
     "state": "swinging",
     "has_item": false,
     "item_type": null,
@@ -53,121 +53,97 @@
   "items": [
     {
       "index": 0,
-      "type": "Mole",
+      "type": "Gold",
       "position": {
-        "x": 693.6640000000024,
-        "y": 392
+        "x": 940,
+        "y": 291
       },
       "size": 30,
-      "point": 602,
-      "is_move": true,
-      "is_explosive": false,
-      "subtype": "MoleWithDiamond",
-      "direction": -1,
-      "ranges": [
-        501,
-        755
-      ]
+      "point": 50,
+      "is_move": false,
+      "is_explosive": false
     },
     {
       "index": 1,
-      "type": "Mole",
+      "type": "Gold",
       "position": {
-        "x": 156.8880000000007,
-        "y": 626
+        "x": 419,
+        "y": 263
       },
       "size": 30,
-      "point": 602,
-      "is_move": true,
-      "is_explosive": false,
-      "subtype": "MoleWithDiamond",
-      "direction": 1,
-      "ranges": [
-        102,
-        360
-      ]
+      "point": 50,
+      "is_move": false,
+      "is_explosive": false
     },
     {
       "index": 2,
-      "type": "Mole",
+      "type": "Gold",
       "position": {
-        "x": 785.896000000003,
-        "y": 490
+        "x": 133,
+        "y": 223
       },
       "size": 30,
-      "point": 602,
-      "is_move": true,
-      "is_explosive": false,
-      "subtype": "MoleWithDiamond",
-      "direction": 1,
-      "ranges": [
-        498,
-        816
-      ]
+      "point": 50,
+      "is_move": false,
+      "is_explosive": false
     },
     {
       "index": 3,
-      "type": "Mole",
+      "type": "Gold",
       "position": {
-        "x": 1120.168,
-        "y": 234
+        "x": 240,
+        "y": 314
       },
       "size": 30,
-      "point": 602,
-      "is_move": true,
-      "is_explosive": false,
-      "subtype": "MoleWithDiamond",
-      "direction": 1,
-      "ranges": [
-        918,
-        1212
-      ]
+      "point": 50,
+      "is_move": false,
+      "is_explosive": false
     },
     {
       "index": 4,
-      "type": "TNT",
+      "type": "Gold",
       "position": {
-        "x": 736,
-        "y": 268
+        "x": 1076,
+        "y": 297
       },
       "size": 30,
-      "point": 0,
-      "is_move": true,
-      "is_explosive": true
+      "point": 50,
+      "is_move": false,
+      "is_explosive": false
     },
     {
       "index": 5,
-      "type": "TNT",
+      "type": "Gold",
       "position": {
-        "x": 467,
-        "y": 637
+        "x": 1091,
+        "y": 513
       },
-      "size": 30,
-      "point": 0,
-      "is_move": true,
-      "is_explosive": true
+      "size": 70,
+      "point": 100,
+      "is_move": false,
+      "is_explosive": false
     },
     {
       "index": 6,
-      "type": "TNT",
+      "type": "Gold",
       "position": {
-        "x": 974,
-        "y": 471
+        "x": 828,
+        "y": 568
       },
-      "size": 30,
-      "point": 0,
-      "is_move": true,
-      "is_explosive": true
+      "size": 70,
+      "point": 100,
+      "is_move": false,
+      "is_explosive": false
     },
     {
       "index": 7,
-      "type": "Rock",
+      "type": "Gold",
       "position": {
-        "x": 1163,
-        "y": 261
+        "x": 119,
+        "y": 480
       },
-      "size": 60,
-      "point": 20,
+      "size": 150,
+      "point": 500,
       "is_move": false,
       "is_explosive": false
     },
@@ -175,11 +151,11 @@
       "index": 8,
       "type": "Rock",
       "position": {
-        "x": 131,
-        "y": 235
+        "x": 590,
+        "y": 323
       },
-      "size": 60,
-      "point": 20,
+      "size": 30,
+      "point": 11,
       "is_move": false,
       "is_explosive": false
     },
@@ -187,11 +163,11 @@
       "index": 9,
       "type": "Rock",
       "position": {
-        "x": 1082,
-        "y": 414
+        "x": 788,
+        "y": 326
       },
-      "size": 60,
-      "point": 20,
+      "size": 30,
+      "point": 11,
       "is_move": false,
       "is_explosive": false
     },
@@ -199,11 +175,11 @@
       "index": 10,
       "type": "Rock",
       "position": {
-        "x": 517,
-        "y": 322
+        "x": 703,
+        "y": 228
       },
-      "size": 60,
-      "point": 20,
+      "size": 30,
+      "point": 11,
       "is_move": false,
       "is_explosive": false
     },
@@ -211,8 +187,8 @@
       "index": 11,
       "type": "Rock",
       "position": {
-        "x": 66,
-        "y": 508
+        "x": 315,
+        "y": 624
       },
       "size": 60,
       "point": 20,
@@ -223,11 +199,11 @@
       "index": 12,
       "type": "Rock",
       "position": {
-        "x": 248,
-        "y": 210
+        "x": 959,
+        "y": 484
       },
-      "size": 30,
-      "point": 11,
+      "size": 60,
+      "point": 20,
       "is_move": false,
       "is_explosive": false
     },
@@ -235,127 +211,23 @@
       "index": 13,
       "type": "Rock",
       "position": {
-        "x": 179,
-        "y": 438
+        "x": 516,
+        "y": 648
       },
-      "size": 30,
-      "point": 11,
+      "size": 60,
+      "point": 20,
       "is_move": false,
       "is_explosive": false
     },
     {
       "index": 14,
-      "type": "Rock",
-      "position": {
-        "x": 309,
-        "y": 440
-      },
-      "size": 30,
-      "point": 11,
-      "is_move": false,
-      "is_explosive": false
-    },
-    {
-      "index": 15,
-      "type": "Rock",
-      "position": {
-        "x": 1070,
-        "y": 632
-      },
-      "size": 30,
-      "point": 11,
-      "is_move": false,
-      "is_explosive": false
-    },
-    {
-      "index": 16,
-      "type": "Other",
-      "position": {
-        "x": 457,
-        "y": 413
-      },
-      "size": 30,
-      "point": 600,
-      "is_move": true,
-      "is_explosive": false,
-      "subtype": "Diamond"
-    },
-    {
-      "index": 17,
-      "type": "Other",
-      "position": {
-        "x": 866,
-        "y": 332
-      },
-      "size": 30,
-      "point": 600,
-      "is_move": true,
-      "is_explosive": false,
-      "subtype": "Diamond"
-    },
-    {
-      "index": 18,
-      "type": "Mole",
-      "position": {
-        "x": 550.1039999999979,
-        "y": 269
-      },
-      "size": 30,
-      "point": 2,
-      "is_move": true,
-      "is_explosive": false,
-      "subtype": "Mole",
-      "direction": -1,
-      "ranges": [
-        424,
-        806
-      ]
-    },
-    {
-      "index": 19,
-      "type": "Mole",
-      "position": {
-        "x": 630.2400000000008,
-        "y": 530
-      },
-      "size": 30,
-      "point": 2,
-      "is_move": true,
-      "is_explosive": false,
-      "subtype": "Mole",
-      "direction": 1,
-      "ranges": [
-        362,
-        718
-      ]
-    },
-    {
-      "index": 20,
-      "type": "Mole",
-      "position": {
-        "x": 1310.095999999996,
-        "y": 535
-      },
-      "size": 30,
-      "point": 2,
-      "is_move": true,
-      "is_explosive": false,
-      "subtype": "Mole",
-      "direction": -1,
-      "ranges": [
-        1054,
-        1334
-      ]
-    },
-    {
-      "index": 21,
       "type": "QuestionBag",
       "position": {
-        "x": 313,
-        "y": 340
+        "x": 1174,
+        "y": 213
       },
       "size": 30,
-      "point": 290,
+      "point": -1,
       "is_move": true,
       "is_explosive": false,
       "lucky": 1

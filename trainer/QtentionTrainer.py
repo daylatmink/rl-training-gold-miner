@@ -329,6 +329,9 @@ class QtentionTrainer:
         # Replay buffer
         self.replay_buffer = ReplayBuffer(buffer_size)
         
+        # Random generator riêng cho selective greedy (để có thể reset seed độc lập)
+        self.selective_rng = random.Random()
+        
         # Tracking
         self.total_steps = 0
         self.episode_rewards = []
@@ -367,6 +370,10 @@ class QtentionTrainer:
         """Copy weights từ agent sang target_agent"""
         self.target_agent.load_state_dict(self.agent.state_dict())
     
+    def set_selective_seed(self, seed: int):
+        """Reset seed cho selective greedy random generator"""
+        self.selective_rng.seed(seed)
+    
     def select_action(self, state: dict, miss_streak: int = 0, training: bool = True, k_random: int = 5) -> tuple:
         """
         Chọn action với epsilon-greedy policy
@@ -393,8 +400,8 @@ class QtentionTrainer:
         if miss_streak > 0:
             with torch.no_grad():
                 q_values = self.agent(type_ids_t, item_feats_t, mov_idx_t, mov_feats_t)  # [1, n_actions]
-                # Random k action indices
-                random_actions = random.sample(range(self.agent.n_actions), min(k_random, self.agent.n_actions))
+                # Random k action indices (dùng selective_rng riêng để reproducible)
+                random_actions = self.selective_rng.sample(range(self.agent.n_actions), min(k_random, self.agent.n_actions))
                 # Lấy Q-values của các actions đó
                 random_q_values = q_values[0, random_actions]
                 # Chọn action có Q-value cao nhất trong k actions
