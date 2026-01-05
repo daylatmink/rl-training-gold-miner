@@ -2,6 +2,7 @@
 Trainer cho Shopping Bandit - Training loop logic
 """
 
+import torch
 import numpy as np
 from typing import Dict
 from tqdm import tqdm
@@ -49,41 +50,43 @@ class ShoppingBanditTrainer:
         episode_rewards = []
         
         try:
-            for episode in tqdm(range(1, num_episodes + 1), desc="Training"):
-                # Set epsilon
-                self.agent.set_train_mode(epsilon=epsilon)
-                
-                # Reset env
-                obs, info = self.env.reset()
-                
-                # Get action
-                action = self.agent.get_action(obs)
-                
-                # Step
-                obs, reward, done, info = self.env.step(action)
-                
-                # Update Q-table
-                level = info['level']
-                self.agent.update(level, action, reward)
-                
-                episode_rewards.append(reward)
-                
-                # Decay epsilon
-                epsilon = max(epsilon_end, epsilon * epsilon_decay)
-                
-                # Logging
-                if episode % 100 == 0:
-                    avg_reward = np.mean(episode_rewards[-100:])
-                    print(f"\nEpisode {episode}/{num_episodes}")
-                    print(f"  Avg Reward (last 100): {avg_reward:.1f}")
-                    print(f"  Epsilon: {epsilon:.4f}")
-                    print(f"  Total episodes: {self.agent.total_episodes}")
-                
-                # Save checkpoint
-                if save_path and episode % save_freq == 0:
-                    checkpoint_path = f"{save_path}_ep_{episode}.npz"
-                    self.agent.save(checkpoint_path)
-                    print(f"  Saved: {checkpoint_path}")
+            # Disable gradient tracking for mining agent (faster)
+            with torch.no_grad():
+                for episode in tqdm(range(1, num_episodes + 1), desc="Training"):
+                    # Set epsilon
+                    self.agent.set_train_mode(epsilon=epsilon)
+                    
+                    # Reset env
+                    obs, info = self.env.reset()
+                    
+                    # Get action
+                    action = self.agent.get_action(obs)
+                    
+                    # Step
+                    obs, reward, done, info = self.env.step(action)
+                    
+                    # Update Q-table
+                    level = info['level']
+                    self.agent.update(level, action, reward)
+                    
+                    episode_rewards.append(reward)
+                    
+                    # Decay epsilon
+                    epsilon = max(epsilon_end, epsilon * epsilon_decay)
+                    
+                    # Logging
+                    if episode % 100 == 0:
+                        avg_reward = np.mean(episode_rewards[-100:])
+                        print(f"\nEpisode {episode}/{num_episodes}")
+                        print(f"  Avg Reward (last 100): {avg_reward:.1f}")
+                        print(f"  Epsilon: {epsilon:.4f}")
+                        print(f"  Total episodes: {self.agent.total_episodes}")
+                    
+                    # Save checkpoint
+                    if save_path and episode % save_freq == 0:
+                        checkpoint_path = f"{save_path}_ep_{episode}.npz"
+                        self.agent.save(checkpoint_path)
+                        print(f"  Saved: {checkpoint_path}")
         
         except KeyboardInterrupt:
             print("\n\n" + "="*60)

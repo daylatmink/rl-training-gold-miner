@@ -355,7 +355,10 @@ class ShoppingEnv(gym.Env):
         
         # Run episode sử dụng trainer.evaluate() giống eval.py
         # evaluate() sẽ chạy 1 episode với greedy policy
-        avg_reward = self.mining_trainer.evaluate(num_episodes=1)
+        # Disable gradient tracking (faster)
+        import torch
+        with torch.no_grad():
+            avg_reward = self.mining_trainer.evaluate(num_episodes=1)
         
         # Get final score
         total_score = get_score()
