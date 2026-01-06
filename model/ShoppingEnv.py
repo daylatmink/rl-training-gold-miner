@@ -14,7 +14,7 @@ import numpy as np
 import random
 from typing import Optional, Dict, Any, Tuple, List
 from dataclasses import dataclass
-
+import torch
 
 # ==================== ACTION ENCODING ====================
 # 5 items -> 32 combinations (5-bit binary)
@@ -356,7 +356,6 @@ class ShoppingEnv(gym.Env):
         # Run episode sử dụng trainer.evaluate() giống eval.py
         # evaluate() sẽ chạy 1 episode với greedy policy
         # Disable gradient tracking (faster)
-        import torch
         with torch.no_grad():
             avg_reward = self.mining_trainer.evaluate(num_episodes=1)
         

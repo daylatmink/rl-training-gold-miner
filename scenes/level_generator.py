@@ -166,7 +166,7 @@ class DataDrivenLevelGenerator:
             }
         },
         'L10': {  # Hardest levels
-            'total_items': (25, 26),
+            'total_items': (20, 22),
             'variant': 'random',  # Two variants
             'variant_a': {  # Lots of gold at bottom, lots of rocks at top
                 'entities': {
@@ -181,9 +181,9 @@ class DataDrivenLevelGenerator:
             },
             'variant_b': {  # Diamond + TNT + MoleWithDiamond heavy
                 'entities': {
-                    'BigGold': 1.5,
+                    'BigGold': 1.0,
                     'MoleWithDiamond': 1.5,
-                    'Diamond': 1.5,
+                    'Diamond': 1.0,
                     'TNT': 3.5,
                     'QuestionBag': 1.0,
                     'Skull': 0.5,
