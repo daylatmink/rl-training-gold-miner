@@ -129,13 +129,8 @@ def generate_random_shop(level: int) -> ShopState:
     
     Sử dụng StoreScene logic để đảm bảo consistent với game
     """
-    from define import get_level, set_level
-    
-    # Temporarily set level để StoreScene generate đúng giá
-    original_level = get_level()
-    set_level(level)
-    
     # Generate shop state giống StoreScene.__init__
+    # KHÔNG thay đổi global level để tránh side effects
     items_available = {
         'rock': random.randint(0, 1) == 1,
         'drink': random.randint(0, 1) == 1,
@@ -165,9 +160,6 @@ def generate_random_shop(level: int) -> ShopState:
     # Dynamite: $1-301 + level*2
     if items_available['dynamite']:
         prices['dynamite'] = random.randint(0, 300) + 1 + level * 2
-    
-    # Restore original level
-    set_level(original_level)
     
     return ShopState(level=level, items_available=items_available, prices=prices)
 
@@ -248,6 +240,9 @@ class ShoppingEnv(gym.Env):
         """
         super().reset(seed=seed)
         
+        # Store seed for mining episode
+        self.current_seed = seed
+        
         # Sample level
         if options and 'level' in options:
             self.current_level = options['level']
@@ -320,13 +315,25 @@ class ShoppingEnv(gym.Env):
         Returns:
             Total score đạt được
         """
-        from define import reset_game_state, get_score
+        from define import reset_game_state, get_score, set_level
+        import random
+        import numpy as np
+        import torch
+        
+        # Use stored seed for mining episode
+        if hasattr(self, 'current_seed') and self.current_seed is not None:
+            random.seed(self.current_seed)
+            np.random.seed(self.current_seed)
+            torch.manual_seed(self.current_seed)
         
         # Reset game state
         reset_game_state()
         
-        # Reset mining env để chạy level mới
-        obs, info = self.mining_env.reset()
+        # Set global level to ensure correct level
+        set_level(self.current_level)
+        
+        # Reset mining env để chạy level mới with correct level and seed
+        obs, info = self.mining_env.reset(seed=self.current_seed, options={'level': self.current_level})
         
         # Apply buffs trực tiếp lên game_scene sau khi reset
         game_scene = self.mining_env.game_scene
@@ -353,11 +360,65 @@ class ShoppingEnv(gym.Env):
             level_id = game_scene.current_level_id
             game_scene.bg, game_scene.items = load_level(level_id, is_clover, is_gem, is_rock)
         
-        # Run episode sử dụng trainer.evaluate() giống eval.py
-        # evaluate() sẽ chạy 1 episode với greedy policy
-        # Disable gradient tracking (faster)
+        # Run episode KHÔNG dùng trainer.evaluate() vì nó sẽ reset lại env với level random
+        # Thay vào đó, chạy trực tiếp episode loop với env đã reset sẵn với level đúng
+        from trainer.QtentionTrainer import angle_bins
+        
+        self.mining_trainer.agent.eval()
+        
+        # Get initial state từ env đã được reset ở trên
+        state = self.mining_env._get_observation()
+        
+        episode_reward = 0.0
+        action_buffer = None
+        reward_buffer = 0
+        angle_decision = None
+        done = False
+        prev_total_points = 0.0
+        miss_streak = 0
+        prev_num_items = -1
+        
         with torch.no_grad():
-            avg_reward = self.mining_trainer.evaluate(num_episodes=1)
+            while True:
+                if not done and (state['rope_state']['state'] in ['expanding', 'retracting'] or state['rope_state']['timer'] > 0):
+                    next_state, reward, terminated, truncated, info = self.mining_env.step(0)
+                else:
+                    if angle_decision is None or done:
+                        if action_buffer is not None:
+                            cur_total_points = sum(item['point'] for item in state['items'])
+                            if reward_buffer == 0 and cur_total_points < prev_total_points:
+                                lost_points = prev_total_points - cur_total_points
+                                tnt_penalty = -self.mining_env.c_tnt * lost_points / self.mining_env.reward_scale
+                                reward_buffer += tnt_penalty
+                            prev_total_points = cur_total_points
+                            
+                            cur_num_items = len(state['items'])
+                            if cur_num_items == prev_num_items:
+                                miss_streak += 1
+                            else:
+                                miss_streak = 0
+                            prev_num_items = cur_num_items
+                            
+                            episode_reward += reward_buffer
+                            reward_buffer = 0
+                            action_buffer = None
+                        if done:
+                            break
+                        action_buffer, _ = self.mining_trainer.select_action(state, miss_streak=miss_streak, training=False)
+                        angle_decision = angle_bins[action_buffer]
+                    
+                    current_angle = state['rope_state']['direction']
+                    if angle_decision is not None and angle_decision[0] <= current_angle and current_angle < angle_decision[1]:
+                        next_state, reward, terminated, truncated, info = self.mining_env.step(1)
+                        angle_decision = None
+                    else:
+                        next_state, reward, terminated, truncated, info = self.mining_env.step(0)
+        
+                done = terminated or truncated
+                reward_buffer += reward
+                state = next_state
+        
+        self.mining_trainer.agent.train()
         
         # Get final score
         total_score = get_score()

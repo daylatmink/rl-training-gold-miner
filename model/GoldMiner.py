@@ -161,6 +161,7 @@ class GoldMinerEnv(gym.Env):
         
         # Check for custom level from options
         custom_level_data = options.get('level_data') if options else None
+        specified_level = options.get('level') if options else None
         
         if custom_level_data:
             # Load custom level
@@ -183,6 +184,21 @@ class GoldMinerEnv(gym.Env):
             from scenes.util import load_level
             self.game_scene.bg, self.game_scene.items = load_level(custom_level_id)
             self.game_scene.current_level_id = custom_level_id
+        elif specified_level is not None:
+            # Use specified level from options
+            self.current_level = specified_level
+            
+            # Create new game scene
+            self.game_scene = GameScene(
+                level=self.current_level,
+                tnt=0,
+                speed=1,
+                is_clover=False,
+                is_gem=False,
+                is_rock=False,
+                use_generated=self.use_generated_levels,
+                time_limit=self.max_steps // 60  # Convert steps to seconds (60 FPS)
+            )
         else:
             # Sample random level từ list
             self.current_level = random.choice(self.levels)
