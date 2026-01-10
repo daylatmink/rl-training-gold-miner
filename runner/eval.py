@@ -17,7 +17,7 @@ from agent.Qtention.Qtention import Qtention
 from agent.QCNN.QCNN import QCNN
 from agent.QCnnRnn.QCnnRnn import QCnnRnn
 from trainer.QtentionTrainer import QtentionTrainer
-from trainer.QcnnTrainer import QcnnTrainer
+from trainer.DoubleQCNNTrainer import DoubleQCNNTrainer as QcnnTrainer
 from trainer.QCnnRnnTrainer import QCnnRnnTrainer
 
 
@@ -41,7 +41,7 @@ def evaluate_agent_with_render(checkpoint_path: str, num_episodes: int = 5, fps:
     env = GoldMinerEnv(
         render_mode='human',  # Hiển thị game
         max_steps=3600,       # 60 giây * 60 FPS
-        levels=10,
+        levels=1,
         use_generated_levels=True,
         c_dyna=10,
         c_step=0.0,
@@ -65,12 +65,7 @@ def evaluate_agent_with_render(checkpoint_path: str, num_episodes: int = 5, fps:
             max_items=30
         )
     elif net == "cnn":
-        agent = QCNN(
-            d_model=24,
-            n_actions=50,
-            d_hidden=24,
-            dropout=0.2
-        )
+        agent = QCNN()
     elif net == "cnn_rnn":
         agent = QCnnRnn(
             d_model=24,
@@ -116,10 +111,7 @@ def evaluate_agent_with_render(checkpoint_path: str, num_episodes: int = 5, fps:
             epsilon_decay=1.0,
             buffer_size=1,
             batch_size=1,
-            target_update_freq=1,
-            train_freq=1,
-            num_planning=1,
-            use_planning=False
+            target_update_freq=1
         )
     else:  # cnn_rnn
         trainer = QCnnRnnTrainer(

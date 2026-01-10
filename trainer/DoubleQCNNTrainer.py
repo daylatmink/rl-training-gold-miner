@@ -1,5 +1,5 @@
 """
-Double Deep Q-Learning Training cho Gold Miner với Qtention Network
+Double Deep Q-Learning Training cho Gold Miner với QCNN Network
 Strategy:
 1. Load warmup buffer
 2. Q-step update n lần
@@ -23,8 +23,8 @@ import logging
 import torch.nn.functional as F
 
 from model.GoldMiner import GoldMinerEnv
-from agent.Qtention.Qtention import Qtention
-from agent.Qtention.Embedder import Embedder
+from agent.QCNN.QCNN import QCNN
+from agent.QCNN.Embedder import Embedder
 from define import set_ai_action_info
 
 # 50 actions - chia đều góc 15-165° thành 50 khoảng (3° mỗi khoảng)
@@ -42,116 +42,62 @@ angle_bins = [
 ]
 
 
+
 class ReplayBuffer:
-    """
-    Replay Buffer cho Qtention với padded transitions.
-    
-    Mỗi transition: (type_ids, item_feats, mov_idx, mov_feats, actual_length,
-                     action, reward, 
-                     next_type_ids, next_item_feats, next_mov_idx, next_mov_feats, next_actual_length,
-                     done)
-    
-    All tensors are already PADDED to max_items + 1.
-    """
-    
+    """Experience Replay Buffer (QCNN-format)."""
+
     def __init__(self, capacity: int = 5000, device='cpu', n_actions: int = 50):
         self.buffer: Deque = deque(maxlen=capacity)
         self.device = device
         self.n_actions = n_actions
         # Track action counts cho inverse frequency exploration
         self.action_counts = np.zeros(n_actions, dtype=np.float32)
-    
-    def push(self, type_ids, item_feats, mov_idx, mov_feats, actual_length,
-             action, reward,
-             next_type_ids, next_item_feats, next_mov_idx, next_mov_feats, next_actual_length,
-             done):
+
+    def push(
+        self,
+        env_feats: torch.Tensor, items_feats: torch.Tensor, mask: torch.Tensor,
+        action: int, reward: float,
+        next_env_feats: torch.Tensor, next_items_feats: torch.Tensor, next_mask: torch.Tensor,
+        done: bool
+    ):
         """
-        Thêm transition vào buffer. Tensors đã được pad sẵn từ warmup script.
+        Lưu transition (CPU tensors).
+        env_feats: [10]
+        items_feats: [max_items, 23]
+        mask: [max_items] (1 real, 0 pad)
         """
-        # Nếu buffer đầy, giảm count của action bị xóa
+        
         if len(self.buffer) == self.buffer.maxlen:
-            old_action = self.buffer[0][5]  # action ở index 5
+            old_action = self.buffer[0][3]  # action ở index 3
             self.action_counts[old_action] = max(0, self.action_counts[old_action] - 1)
         
-        # Thêm transition mới
         self.buffer.append((
-            type_ids.to(self.device), item_feats.to(self.device), 
-            mov_idx.to(self.device), mov_feats.to(self.device), actual_length,
+            env_feats, items_feats, mask,
             action, reward,
-            next_type_ids.to(self.device), next_item_feats.to(self.device),
-            next_mov_idx.to(self.device), next_mov_feats.to(self.device), next_actual_length,
+            next_env_feats, next_items_feats, next_mask,
             done
         ))
         
-        # Update action count
         self.action_counts[action] += 1
-    
-    def sample(self, batch_size: int) -> dict:
-        """
-        Sample random batch. Vì đã pad sẵn, chỉ cần stack.
-        """
+
+    def sample(self, batch_size: int):
         batch = random.sample(self.buffer, batch_size)
-        
-        # Unpack
-        type_ids_list, item_feats_list, mov_idx_list, mov_feats_list, lengths, \
-        actions, rewards, \
-        next_type_ids_list, next_item_feats_list, next_mov_idx_list, next_mov_feats_list, next_lengths, \
-        dones = zip(*batch)
-        
-        # Stack tensors (already same shape due to padding)
+
+        env_feats, items_feats, masks, actions, rewards, next_env_feats, next_items_feats, next_masks, dones = zip(*batch)
+
         return {
-            'type_ids': torch.stack(type_ids_list),
-            'item_feats': torch.stack(item_feats_list),
-            'mov_idx': self._stack_1d_with_padding(mov_idx_list, pad_value=-1),
-            'mov_feats': self._stack_2d_with_padding(mov_feats_list, feat_dim=3, pad_value=0.0),
-            'lengths': torch.tensor(lengths, dtype=torch.long, device=self.device),
-            'actions': torch.tensor(actions, dtype=torch.long, device=self.device),
-            'rewards': torch.tensor(rewards, dtype=torch.float32, device=self.device),
-            'next_type_ids': torch.stack(next_type_ids_list),
-            'next_item_feats': torch.stack(next_item_feats_list),
-            'next_mov_idx': self._stack_1d_with_padding(next_mov_idx_list, pad_value=-1),
-            'next_mov_feats': self._stack_2d_with_padding(next_mov_feats_list, feat_dim=3, pad_value=0.0),
-            'next_lengths': torch.tensor(next_lengths, dtype=torch.long, device=self.device),
-            'dones': torch.tensor(dones, dtype=torch.float32, device=self.device)
+            "env_feats": torch.stack(env_feats, dim=0),                 # [B,10]
+            "items_feats": torch.stack(items_feats, dim=0),             # [B,M,23]
+            "masks": torch.stack(masks, dim=0),                         # [B,M]
+            "actions": torch.tensor(actions, dtype=torch.long),         # [B]
+            "rewards": torch.tensor(rewards, dtype=torch.float32),      # [B]
+            "next_env_feats": torch.stack(next_env_feats, dim=0),       # [B,10]
+            "next_items_feats": torch.stack(next_items_feats, dim=0),   # [B,M,23]
+            "next_masks": torch.stack(next_masks, dim=0),               # [B,M]
+            "dones": torch.tensor(dones, dtype=torch.float32),          # [B]
         }
-    
-    def _stack_1d_with_padding(self, tensor_list, pad_value=-1):
-        """Stack 1D tensors (mov_idx) với padding"""
-        sizes = [t.size(0) for t in tensor_list]
-        max_len = max(sizes)
-        
-        if max_len == 0:
-            return None
-        
-        padded = []
-        for t, size in zip(tensor_list, sizes):
-            if size == 0:
-                t = torch.full((max_len,), pad_value, dtype=torch.long, device=self.device)
-            elif size < max_len:
-                t = F.pad(t, (0, max_len - size), value=pad_value)
-            padded.append(t)
-        
-        return torch.stack(padded)
-    
-    def _stack_2d_with_padding(self, tensor_list, feat_dim, pad_value=0.0):
-        """Stack 2D tensors (mov_feats) với padding"""
-        sizes = [t.size(0) for t in tensor_list]
-        max_len = max(sizes)
-        
-        if max_len == 0:
-            return None
-        
-        padded = []
-        for t, size in zip(tensor_list, sizes):
-            if size == 0:
-                t = torch.full((max_len, feat_dim), pad_value, dtype=torch.float32, device=self.device)
-            elif size < max_len:
-                t = F.pad(t, (0, 0, 0, max_len - size), value=pad_value)
-            padded.append(t)
-        
-        return torch.stack(padded)
-    
-    def __len__(self):
+
+    def __len__(self) -> int:
         return len(self.buffer)
     
     def get_explore_probs(self, temperature: float = 0.5) -> np.ndarray:
@@ -186,7 +132,7 @@ class ReplayBuffer:
         return np.random.choice(self.n_actions, p=probs)
 
 
-class DoubleQtentionTrainer:
+class DoubleQCNNTrainer:
     """
     Double DQN Trainer với strategy:
     1. Load buffer
@@ -198,7 +144,7 @@ class DoubleQtentionTrainer:
     def __init__(
         self,
         env: GoldMinerEnv,
-        agent: Qtention,
+        agent: QCNN,
         lr: float = 1e-4,
         gamma: float = 0.99,
         epsilon_start: float = 0.9,
@@ -224,13 +170,7 @@ class DoubleQtentionTrainer:
         self.target_update_freq = target_update_freq
         
         # Target network
-        self.target_agent = QCNN(
-            d_model=agent.d_model,
-            n_actions=agent.n_actions,
-            n_res_blocks=agent.n_res_blocks,
-            d_hidden=agent.d_hidden,
-            dropout=agent.dropout
-        ).to(device)
+        self.target_agent = QCNN().to(device)
         self.update_target_network()
         self.target_agent.eval()
         
@@ -250,6 +190,8 @@ class DoubleQtentionTrainer:
         
         # Logger
         self.logger = None
+        # Random generator riêng cho selective greedy (để có thể reset seed độc lập)
+        self.selective_rng = random.Random()
     
     def load_warmup_buffer(self, warmup_path: str):
         """Load warmup buffer từ file"""
@@ -273,7 +215,7 @@ class DoubleQtentionTrainer:
     
     def setup_logger(self, log_file: str = 'training.log'):
         """Setup logger"""
-        self.logger = logging.getLogger('DoubleQtentionTrainer')
+        self.logger = logging.getLogger('DoubleQCNNTrainer')
         self.logger.setLevel(logging.INFO)
         self.logger.handlers = []
         
@@ -293,75 +235,59 @@ class DoubleQtentionTrainer:
         """Copy weights từ online agent sang target agent"""
         self.target_agent.load_state_dict(self.agent.state_dict())
     
-    def create_mask(self, type_ids, actual_length):
+    @torch.no_grad()
+    def select_action(self, state: dict, miss_streak: int = 0, training: bool = True, k_random: int = 5) -> tuple:
         """
-        Tạo attention mask từ actual_length.
+        Chọn action với epsilon-greedy policy
         
         Args:
-            type_ids: [B, L] - không dùng nhưng để biết L
-            actual_length: [B] - số tokens thực tế
-        
+            state: Game state dict
+            miss_streak: Số lần miss liên tiếp
+            training: Nếu True thì dùng epsilon-greedy, False thì greedy
+            k_random: Số actions random để chọn max khi miss (default: 5)
+            
         Returns:
-            mask: [B, L] - True cho padding positions
+            (action, used_model): action được chọn và flag cho biết có dùng model không
         """
-        B, L = type_ids.shape
-        # Create position indices: [B, L]
-        positions = torch.arange(L, device=type_ids.device).unsqueeze(0).expand(B, -1)
-        # Mask: True where position >= actual_length
-        mask = positions >= actual_length.unsqueeze(1)
-        return mask
-    
-    @torch.no_grad()
-    def select_action(self, state: dict, training: bool = True) -> Tuple[int, bool]:
-        """
-        Epsilon-greedy action selection với inverse frequency exploration.
-        Khi explore, ưu tiên các action ít xuất hiện trong buffer.
+        # Preprocess state
+        env_feats, items_feats, mask = Embedder.preprocess_state(state)
         
-        Returns:
-            (action, used_model): action index and whether model was used
-        """
-        q_value = None  # Initialize
+        # Convert to torch tensors và chuyển sang device
+        type_ids_t = env_feats.unsqueeze(0).to(self.device)            # [1, 10]
+        item_feats_t = items_feats.unsqueeze(0).to(self.device)        # [1, M, 23]
+        mask_t = mask.unsqueeze(0).to(self.device)                  # [1, M]
         
-        if training and random.random() < self.epsilon:
-            # Explore: sample theo inverse frequency của buffer
-            action = self.replay_buffer.sample_action_by_inverse_freq(self.explore_temperature)
-            used_model = False
-        else:
-            # Preprocess state
-            type_ids, item_feats, mov_idx, mov_feats = Embedder.preprocess_state(state, max_items=self.max_items)
-            
-            # Pad to max_length
-            max_length = self.max_items + 1
-            actual_length = len(type_ids)
-            
-            if actual_length < max_length:
-                pad_size = max_length - actual_length
-                type_ids = torch.cat([type_ids, torch.full((pad_size,), Embedder.TOKEN_TYPES['PAD'], dtype=torch.int64)])
-                item_feats = torch.cat([item_feats, torch.zeros((pad_size, 10), dtype=torch.float32)])
-            
-            # Create mask
-            mask = torch.arange(max_length) >= actual_length
-            
-            # Add batch dimension and move to device
-            type_ids = type_ids.unsqueeze(0).to(self.device)
-            item_feats = item_feats.unsqueeze(0).to(self.device)
-            mask = mask.unsqueeze(0).to(self.device)
-            
-            if mov_idx.numel() > 0:
-                mov_idx = mov_idx.unsqueeze(0).to(self.device)
-                mov_feats = mov_feats.unsqueeze(0).to(self.device)
-            else:
-                mov_idx = None
-                mov_feats = None
-            
-            # Forward pass
-            q_values = self.agent(type_ids, item_feats, mov_idx, mov_feats, mask)
-            action = q_values.argmax(dim=1).item()
-            q_value = q_values[0, action].item()
+        # Sau khi kéo hụt: random k actions và chọn max trong k đó (ưu tiên hơn epsilon-greedy)
+        if miss_streak > 0:
+            with torch.no_grad():
+                q_values = self.agent(type_ids_t, item_feats_t, mask_t)  # [1, n_actions]
+                # Random k action indices (dùng selective_rng riêng để reproducible)
+                random_actions = self.selective_rng.sample(range(self.agent.n_actions), min(k_random, self.agent.n_actions))
+                # Lấy Q-values của các actions đó
+                random_q_values = q_values[0, random_actions]
+                # Chọn action có Q-value cao nhất trong k actions
+                best_idx = random_q_values.argmax().item()
+                action = random_actions[best_idx]
+                q_value = random_q_values[best_idx].cpu().item()
             used_model = True
+            action_mode = 'selective_random'
+        # Epsilon-greedy action selection (chỉ khi miss_streak == 0)
+        elif training and random.random() < self.epsilon:
+            action = random.randint(0, self.agent.n_actions - 1)
+            used_model = False
+            q_value = None
+            action_mode = 'random'
+        else:
+            with torch.no_grad():
+                q_values = self.agent(type_ids_t, item_feats_t, mask_t)  # [1, n_actions]
+                action = q_values.argmax(dim=1).item()
+                q_value = q_values[0][action].cpu().item()
+            used_model = True
+            action_mode = 'model'
         
-        # Set AI action info for display
-        set_ai_action_info(action, q_value, used_model)
+        # Lưu thông tin action vào global state để hiển thị trên màn hình
+        from define import set_ai_action_info
+        set_ai_action_info(action, q_value, used_model, action_mode)
         
         return action, used_model
     
@@ -384,37 +310,33 @@ class DoubleQtentionTrainer:
             # Sample batch
             batch = self.replay_buffer.sample(self.batch_size)
             
-            # Create masks
-            mask = self.create_mask(batch['type_ids'], batch['lengths'])
-            next_mask = self.create_mask(batch['next_type_ids'], batch['next_lengths'])
-            
             # Forward pass - Online network
             q_values = self.agent(
-                batch['type_ids'], batch['item_feats'],
-                batch['mov_idx'], batch['mov_feats'], mask
+                batch['env_feats'].cuda(), batch['items_feats'].cuda(),
+                batch['masks'].cuda()
             )  # [B, n_actions]
             
             # Q(s, a)
-            q_sa = q_values.gather(1, batch['actions'].unsqueeze(1)).squeeze(1)  # [B]
+            q_sa = q_values.gather(1, batch['actions'].unsqueeze(1).cuda()).squeeze(1)  # [B]
             
             # Double DQN target
             with torch.no_grad():
                 # Online network chọn action
                 next_q_online = self.agent(
-                    batch['next_type_ids'], batch['next_item_feats'],
-                    batch['next_mov_idx'], batch['next_mov_feats'], next_mask
+                    batch['next_env_feats'].cuda(), batch['next_items_feats'].cuda(),
+                    batch['next_masks'].cuda()
                 )  # [B, n_actions]
                 best_next_actions = next_q_online.argmax(dim=1)  # [B]
                 
                 # Target network đánh giá action
                 next_q_target = self.target_agent(
-                    batch['next_type_ids'], batch['next_item_feats'],
-                    batch['next_mov_idx'], batch['next_mov_feats'], next_mask
+                    batch['next_env_feats'].cuda(), batch['next_items_feats'].cuda(),
+                    batch['next_masks'].cuda()
                 )  # [B, n_actions]
                 next_q = next_q_target.gather(1, best_next_actions.unsqueeze(1)).squeeze(1)  # [B]
                 
                 # Target = r + gamma * Q_target(s', argmax_a Q_online(s', a))
-                target = batch['rewards'] + self.gamma * next_q * (1 - batch['dones'])
+                target = batch['rewards'].cuda() + self.gamma * next_q * (1 - batch['dones'].cuda())
             
             # Loss
             loss = F.smooth_l1_loss(q_sa, target)
@@ -463,26 +385,18 @@ class DoubleQtentionTrainer:
                     if angle_decision is None or done:
                         if state_buffer is not None:
                             # Save transition
-                            old_type_ids, old_item_feats, old_mov_idx, old_mov_feats, old_length = state_buffer
+                            old_env_feats, old_items_feats, old_mask = state_buffer
                             
                             # Preprocess new state
-                            new_type_ids, new_item_feats, new_mov_idx, new_mov_feats = Embedder.preprocess_state(
+                            new_env_feats, new_items_feats, new_mask = Embedder.preprocess_state(
                                 state, max_items=self.max_items
                             )
                             
-                            # Pad new state
-                            max_length = self.max_items + 1
-                            new_length = len(new_type_ids)
-                            if new_length < max_length:
-                                pad_size = max_length - new_length
-                                new_type_ids = torch.cat([new_type_ids, torch.full((pad_size,), Embedder.TOKEN_TYPES['PAD'], dtype=torch.int64)])
-                                new_item_feats = torch.cat([new_item_feats, torch.zeros((pad_size, 10), dtype=torch.float32)])
-                            
                             # Push to buffer
                             self.replay_buffer.push(
-                                old_type_ids, old_item_feats, old_mov_idx, old_mov_feats, old_length,
+                                old_env_feats, old_items_feats, old_mask,
                                 action_buffer, reward_buffer,
-                                new_type_ids, new_item_feats, new_mov_idx, new_mov_feats, new_length,
+                                new_env_feats, new_items_feats, new_mask,
                                 done
                             )
                             
@@ -497,16 +411,9 @@ class DoubleQtentionTrainer:
                         angle_decision = angle_bins[action_buffer]
                         
                         # Preprocess and pad state
-                        type_ids, item_feats, mov_idx, mov_feats = Embedder.preprocess_state(state, max_items=self.max_items)
-                        max_length = self.max_items + 1
-                        actual_length = len(type_ids)
+                        env_feats, items_feats, mask = Embedder.preprocess_state(state, max_items=self.max_items)
                         
-                        if actual_length < max_length:
-                            pad_size = max_length - actual_length
-                            type_ids = torch.cat([type_ids, torch.full((pad_size,), Embedder.TOKEN_TYPES['PAD'], dtype=torch.int64)])
-                            item_feats = torch.cat([item_feats, torch.zeros((pad_size, 10), dtype=torch.float32)])
-                        
-                        state_buffer = (type_ids, item_feats, mov_idx, mov_feats, actual_length)
+                        state_buffer = (env_feats, items_feats, mask)
                         reward_buffer = 0.0
                     
                     # Execute action
@@ -550,7 +457,7 @@ class DoubleQtentionTrainer:
             self.load_warmup_buffer(warmup_buffer_path)
         
         self.log("\n" + "="*70)
-        self.log("Double Qtention Training Started")
+        self.log("Double QCNN Training Started")
         self.log("="*70)
         self.log(f"Cycles: {n_cycles}")
         self.log(f"Updates per cycle: {n_updates_per_cycle}")
@@ -612,3 +519,76 @@ class DoubleQtentionTrainer:
         self.epsilon = checkpoint['epsilon']
         self.total_steps = checkpoint['total_steps']
         print(f"✓ Checkpoint loaded from {path}")
+
+    
+    def evaluate(self, num_episodes: int = 5) -> float:
+        """
+        Evaluate agent với greedy policy - logic giống train_episode
+        
+        Args:
+            num_episodes: Số episodes để evaluate
+            
+        Returns:
+            avg_reward: Average reward
+        """
+        self.agent.eval()
+        eval_rewards = []
+        
+        for _ in range(num_episodes):
+            state, _ = self.env.reset()
+            episode_reward = 0.0
+            episode_steps = 0
+            action_buffer = None
+            reward_buffer = 0
+            angle_decision = None
+            done = False
+            prev_total_points = 0.0  # Track tổng point để detect TNT
+            miss_streak = 0  # Số lần miss liên tiếp
+            prev_num_items = -1  # Số items trước đó để detect miss
+            
+            while True:
+                if not done and (state['rope_state']['state'] in ['expanding', 'retracting'] or state['rope_state']['timer'] > 0):
+                    next_state, reward, terminated, truncated, info = self.env.step(0)  # No-op action
+                else:
+                    if angle_decision is None or done:
+                        if action_buffer is not None:
+                            # Phát hiện TNT explosion
+                            cur_total_points = sum(item['point'] for item in state['items'])
+                            if reward_buffer == 0 and cur_total_points < prev_total_points:
+                                lost_points = prev_total_points - cur_total_points
+                                tnt_penalty = -self.env.c_tnt * lost_points / self.env.reward_scale
+                                reward_buffer += tnt_penalty
+                            prev_total_points = cur_total_points
+                            
+                            # Track miss_streak
+                            cur_num_items = len(state['items'])
+                            if cur_num_items == prev_num_items:
+                                miss_streak += 1
+                            else:
+                                miss_streak = 0
+                            prev_num_items = cur_num_items
+                            
+                            episode_reward += reward_buffer
+                            episode_steps += 1
+                            reward_buffer = 0
+                            action_buffer = None
+                        if done:
+                            break
+                        action_buffer, used_model = self.select_action(state, miss_streak=miss_streak, training=False)  # Greedy
+                        angle_decision = angle_bins[action_buffer]
+                    
+                    current_angle = state['rope_state']['direction']
+                    if angle_decision is not None and angle_decision[0] <= current_angle and current_angle < angle_decision[1]:
+                        next_state, reward, terminated, truncated, info = self.env.step(1)  # Fire action
+                        angle_decision = None
+                    else:
+                        next_state, reward, terminated, truncated, info = self.env.step(0)  # No-op action
+        
+                done = terminated or truncated
+                reward_buffer += reward
+                state = next_state
+            
+            eval_rewards.append(episode_reward)
+        
+        self.agent.train()
+        return np.mean(eval_rewards)

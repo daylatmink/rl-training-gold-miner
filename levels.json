@@ -492,128 +492,109 @@
             {
                 "type": "MiniGold",
                 "pos": {
-                    "x": 496,
-                    "y": 317
+                    "x": 997,
+                    "y": 270
                 }
             },
             {
                 "type": "MiniGold",
                 "pos": {
-                    "x": 673,
-                    "y": 207
+                    "x": 565,
+                    "y": 238
                 }
             },
             {
                 "type": "MiniGold",
                 "pos": {
-                    "x": 1110,
-                    "y": 269
-                }
-            },
-            {
-                "type": "MiniGold",
-                "pos": {
-                    "x": 789,
-                    "y": 315
-                }
-            },
-            {
-                "type": "MiniGold",
-                "pos": {
-                    "x": 275,
-                    "y": 324
-                }
-            },
-            {
-                "type": "MiniGold",
-                "pos": {
-                    "x": 952,
-                    "y": 267
-                }
-            },
-            {
-                "type": "MiniGold",
-                "pos": {
-                    "x": 381,
+                    "x": 357,
                     "y": 206
                 }
             },
             {
-                "type": "NormalGold",
+                "type": "MiniGold",
                 "pos": {
-                    "x": 315,
-                    "y": 502
+                    "x": 718,
+                    "y": 302
+                }
+            },
+            {
+                "type": "MiniGold",
+                "pos": {
+                    "x": 481,
+                    "y": 340
                 }
             },
             {
                 "type": "NormalGold",
                 "pos": {
-                    "x": 691,
-                    "y": 388
+                    "x": 979,
+                    "y": 448
                 }
             },
             {
                 "type": "NormalGold",
                 "pos": {
-                    "x": 1096,
-                    "y": 453
-                }
-            },
-            {
-                "type": "NormalGold",
-                "pos": {
-                    "x": 838,
-                    "y": 597
+                    "x": 319,
+                    "y": 405
                 }
             },
             {
                 "type": "BigGold",
                 "pos": {
-                    "x": 1108,
-                    "y": 610
-                }
-            },
-            {
-                "type": "BigGold",
-                "pos": {
-                    "x": 215,
-                    "y": 583
-                }
-            },
-            {
-                "type": "BigGold",
-                "pos": {
-                    "x": 711,
-                    "y": 600
+                    "x": 599,
+                    "y": 449
                 }
             },
             {
                 "type": "MiniRock",
                 "pos": {
-                    "x": 146,
-                    "y": 300
+                    "x": 176,
+                    "y": 257
+                }
+            },
+            {
+                "type": "MiniRock",
+                "pos": {
+                    "x": 852,
+                    "y": 244
+                }
+            },
+            {
+                "type": "MiniRock",
+                "pos": {
+                    "x": 1145,
+                    "y": 303
                 }
             },
             {
                 "type": "NormalRock",
                 "pos": {
-                    "x": 493,
-                    "y": 454
+                    "x": 849,
+                    "y": 557
                 }
             },
             {
                 "type": "NormalRock",
                 "pos": {
-                    "x": 945,
-                    "y": 429
+                    "x": 107,
+                    "y": 568
                 }
             },
             {
-                "type": "Diamond",
+                "type": "MoleWithDiamond",
                 "pos": {
-                    "x": 227,
-                    "y": 202
-                }
+                    "x": 519,
+                    "y": 560
+                },
+                "dir": "Left"
+            },
+            {
+                "type": "MoleWithDiamond",
+                "pos": {
+                    "x": 193,
+                    "y": 399
+                },
+                "dir": "Left"
             }
         ]
     },
@@ -4579,88 +4560,6 @@
         ]
     },
     "L9_1": {
-        "type": "LevelA",
-        "entities": [
-            {
-                "type": "BigGold",
-                "pos": {
-                    "x": 445,
-                    "y": 588
-                }
-            },
-            {
-                "type": "MiniRock",
-                "pos": {
-                    "x": 479,
-                    "y": 439
-                }
-            },
-            {
-                "type": "MiniRock",
-                "pos": {
-                    "x": 634,
-                    "y": 310
-                }
-            },
-            {
-                "type": "MiniRock",
-                "pos": {
-                    "x": 1091,
-                    "y": 320
-                }
-            },
-            {
-                "type": "MiniRock",
-                "pos": {
-                    "x": 1167,
-                    "y": 593
-                }
-            },
-            {
-                "type": "MiniRock",
-                "pos": {
-                    "x": 748,
-                    "y": 369
-                }
-            },
-            {
-                "type": "NormalRock",
-                "pos": {
-                    "x": 912,
-                    "y": 380
-                }
-            },
-            {
-                "type": "NormalRock",
-                "pos": {
-                    "x": 185,
-                    "y": 401
-                }
-            },
-            {
-                "type": "NormalRock",
-                "pos": {
-                    "x": 786,
-                    "y": 568
-                }
-            },
-            {
-                "type": "NormalRock",
-                "pos": {
-                    "x": 1127,
-                    "y": 479
-                }
-            },
-            {
-                "type": "Diamond",
-                "pos": {
-                    "x": 434,
-                    "y": 311
-                }
-            }
-        ]
-    },
-    "L9_2": {
         "type": "LevelA",
         "entities": [
             {

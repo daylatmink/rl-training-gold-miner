@@ -14,14 +14,204 @@ import numpy as np
 from datetime import datetime
 from typing import Dict, List, Tuple
 import json
+import pygame
+import time
 
 from model.GoldMiner import GoldMinerEnv
 from model.ShoppingEnv import ShoppingEnv, generate_random_shop, get_valid_actions, decode_action, calculate_cost
 from agent.Qtention.Qtention import Qtention
 from agent.ShoppingAgent import ShoppingAgent
 from trainer.QtentionTrainer import QtentionTrainer, angle_bins
-from define import set_level, set_score, set_dynamite_count, get_dynamite_count, get_score, reset_game_state, get_level
+from define import (set_level, set_score, set_dynamite_count, get_dynamite_count, 
+                    get_score, reset_game_state, get_level, set_goal, get_goal, goalAddOn)
 import random
+
+
+def render_shop_scene(shop_state, money: int, items_bought: Dict, cost: int, show_window: bool = True):
+    """
+    Hiển thị cửa hàng và quá trình mua hàng của agent
+    
+    Args:
+        shop_state: ShopState với items_available và prices
+        money: Số tiền hiện có
+        items_bought: Dict với các items đã mua {rock, drink, gem, clover, dynamite}
+        cost: Tổng chi phí
+        show_window: Có hiển thị window không
+    """
+    if not show_window:
+        return
+    
+    from define import (screen, screen_width, screen_height, 
+                        rock_collectors_book, strength_drink, gem_polish, 
+                        clover, dynamite_shop, table_image, dialog_image,
+                        shopkeeper_images)
+    
+    # Load store background
+    store_BG = pygame.image.load('./assets/images/bg_shop.png')
+    
+    # Font
+    font = pygame.font.Font(os.path.join("assets", "fonts", 'Fernando.ttf'), 28)
+    title_font = pygame.font.Font(os.path.join("assets", "fonts", 'Fernando.ttf'), 36)
+    
+    # Item names mapping
+    item_names = {
+        'rock': 'Sách Người sưu tầm đá',
+        'drink': 'Nước tăng lực',
+        'gem': 'Đánh bóng đá quý',
+        'clover': 'Cỏ may mắn',
+        'dynamite': 'Thuốc nổ'
+    }
+    
+    item_images = {
+        'rock': rock_collectors_book,
+        'drink': strength_drink,
+        'gem': gem_polish,
+        'clover': clover,
+        'dynamite': dynamite_shop
+    }
+    
+    item_positions = {
+        'rock': (87, 420),
+        'drink': (300, 400),
+        'gem': (500, 440),
+        'clover': (650, 420),
+        'dynamite': (800, 425)
+    }
+    
+    price_positions = {
+        'rock': (140, 565),
+        'drink': (350, 565),
+        'gem': (550, 565),
+        'clover': (690, 565),
+        'dynamite': (820, 565)
+    }
+    
+    # Animation frames
+    clock = pygame.time.Clock()
+    
+    # Phase 1: Show shop (2 seconds)
+    start_time = time.time()
+    while time.time() - start_time < 2.0:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                return
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
+                break
+        
+        # Draw background
+        screen.blit(store_BG, (0, 0))
+        
+        # Draw money
+        screen.blit(font.render(f"Tiền: ${money}", True, (0, 0, 0)), (5, 0))
+        
+        # Draw shopkeeper
+        shopkeeper_img = shopkeeper_images[0]
+        screen.blit(shopkeeper_img, (900, 250))
+        
+        # Draw table
+        screen.blit(table_image, table_image.get_rect(bottom=screen_height))
+        
+        # Draw dialog
+        screen.blit(dialog_image, (220, 100))
+        
+        # Draw title
+        title_text = font.render("AI đang quyết định mua hàng...", True, (0, 0, 0))
+        screen.blit(title_text, (280, 120))
+        
+        # Draw available items with prices
+        for item_key in ['rock', 'drink', 'gem', 'clover', 'dynamite']:
+            if shop_state.items_available.get(item_key, False):
+                # Draw item image (scaled)
+                img = item_images[item_key]
+                scaled_img = pygame.transform.scale2x(img)
+                pos = item_positions[item_key]
+                screen.blit(scaled_img, pos)
+                
+                # Draw price
+                price = shop_state.prices.get(item_key, 0)
+                price_text = font.render(f"${price}", True, (0, 150, 0))
+                price_pos = price_positions[item_key]
+                screen.blit(price_text, price_pos)
+        
+        pygame.display.flip()
+        clock.tick(60)
+    
+    # Phase 2: Show what agent bought (2 seconds)
+    start_time = time.time()
+    while time.time() - start_time < 2.0:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                return
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
+                break
+        
+        # Draw background
+        screen.blit(store_BG, (0, 0))
+        
+        # Draw money after purchase
+        money_after = money - cost
+        screen.blit(font.render(f"Tiền: ${money} → ${money_after}", True, (0, 0, 0)), (5, 0))
+        
+        # Draw shopkeeper (happy frame if bought something)
+        bought_any = any(items_bought.values())
+        shopkeeper_img = shopkeeper_images[1 if bought_any else 0]
+        screen.blit(shopkeeper_img, (900, 250))
+        
+        # Draw table
+        screen.blit(table_image, table_image.get_rect(bottom=screen_height))
+        
+        # Draw dialog with purchase info
+        screen.blit(dialog_image, (220, 100))
+        
+        # Build purchase message
+        bought_items = [item_names[k] for k, v in items_bought.items() if v]
+        if bought_items:
+            msg = "AI đã mua:\n" + "\n".join(f"  ✓ {item}" for item in bought_items)
+            msg += f"\n\nTổng chi phí: ${cost}"
+        else:
+            msg = "AI quyết định KHÔNG mua gì\n\nTiết kiệm tiền cho level sau!"
+        
+        # Render multiline text
+        y_offset = 120
+        for line in msg.split('\n'):
+            text_surface = font.render(line, True, (0, 0, 0))
+            screen.blit(text_surface, (280, y_offset))
+            y_offset += 30
+        
+        # Draw items with highlight on purchased ones
+        for item_key in ['rock', 'drink', 'gem', 'clover', 'dynamite']:
+            if shop_state.items_available.get(item_key, False):
+                img = item_images[item_key]
+                scaled_img = pygame.transform.scale2x(img)
+                pos = item_positions[item_key]
+                
+                # Highlight purchased items
+                if items_bought.get(item_key, False):
+                    # Draw green border around purchased item
+                    rect = pygame.Rect(pos[0] - 5, pos[1] - 5, 
+                                       scaled_img.get_width() + 10, 
+                                       scaled_img.get_height() + 10)
+                    pygame.draw.rect(screen, (0, 255, 0), rect, 4)
+                    screen.blit(scaled_img, pos)
+                    
+                    # Draw "BOUGHT" text
+                    bought_text = font.render("MUA!", True, (0, 200, 0))
+                    screen.blit(bought_text, (pos[0] + 20, pos[1] - 30))
+                else:
+                    # Dim unpurchased items
+                    dimmed = scaled_img.copy()
+                    dimmed.set_alpha(100)
+                    screen.blit(dimmed, pos)
+                
+                # Draw price
+                price = shop_state.prices.get(item_key, 0)
+                color = (0, 200, 0) if items_bought.get(item_key, False) else (100, 100, 100)
+                price_text = font.render(f"${price}", True, color)
+                price_pos = price_positions[item_key]
+                screen.blit(price_text, price_pos)
+        
+        pygame.display.flip()
+        clock.tick(60)
 
 
 class RandomMiningWrapper:
@@ -112,6 +302,8 @@ def run_mining_phase(
     trainer,  # QtentionTrainer or RandomMiningWrapper
     level: int,
     seed: int = None,
+    current_total_money: int = 0,  # Tổng tiền hiện có từ các level trước
+    current_dynamite: int = 0,  # Số dynamite hiện có
 ) -> Dict:
     """
     Chạy mining phase cho một level using trainer's evaluate logic
@@ -120,6 +312,8 @@ def run_mining_phase(
         trainer: Mining agent trainer
         level: Level number
         seed: Random seed for reproducibility
+        current_total_money: Tổng tiền đã kiếm được từ các level trước
+        current_dynamite: Số dynamite hiện có
     
     Returns:
         Dict với 'score', 'success', 'goal', 'reward', 'steps'
@@ -133,8 +327,22 @@ def run_mining_phase(
     # Set global level state to ensure correct level is used
     set_level(level)
     
+    # Lưu dynamite trước khi reset (vì reset_game_state() sẽ xóa dynamite)
     # Reset env to specific level with seed
     state, info = trainer.env.reset(seed=seed, options={'level': level})
+    
+    # Khôi phục lại tổng tiền đã có
+    set_score(current_total_money)
+    
+    # Khôi phục dynamite
+    set_dynamite_count(current_dynamite)
+    # Cũng cập nhật rope.have_TNT trong game_scene
+    if trainer.env.game_scene is not None:
+        trainer.env.game_scene.rope.have_TNT = current_dynamite
+    
+    # Cập nhật goal theo level: goal = 650 + (level - 1) * goalAddOn
+    level_goal = 650 + (level - 1) * goalAddOn
+    set_goal(level_goal)
     
     episode_reward = 0.0
     episode_steps = 0
@@ -148,6 +356,23 @@ def run_mining_phase(
     
     # Main episode loop (similar to trainer.evaluate)
     while True:
+        # Auto-use dynamite khi đang kéo đá lớn (BigRock)
+        rope_state = state['rope_state']
+        if (rope_state['state'] == 'retracting' and 
+            rope_state['has_item'] and 
+            rope_state['item_type'] == 'Rock' and
+            rope_state['tnt_count'] > 0 and
+            not rope_state.get('is_use_tnt', False)):
+            # Kiểm tra xem có phải đá lớn không (dựa vào weight hoặc point)
+            # Rock lớn có weight cao (base_weight * 3, với size >= 60 thì base_weight >= 2)
+            if rope_state['weight'] >= 6:  # Đá lớn: size >= 60 → weight = (60/30) * 3 = 6
+                # Tự động dùng dynamite
+                next_state, reward, terminated, truncated, info = trainer.env.step(1)
+                done = terminated or truncated
+                reward_buffer += reward
+                state = next_state
+                continue
+        
         if not done and (state['rope_state']['state'] in ['expanding', 'retracting'] or state['rope_state']['timer'] > 0):
             next_state, reward, terminated, truncated, info = trainer.env.step(0)  # No-op action
         else:
@@ -190,11 +415,13 @@ def run_mining_phase(
         state = next_state
     
     # Extract results from final info
-    # Get actual gold earned from define.get_score()
-    gold_earned = get_score()
+    # Get actual gold earned in THIS level = total score - money before level
+    final_total_score = get_score()
+    gold_earned_this_level = final_total_score - current_total_money
     
     return {
-        'gold_earned': gold_earned,
+        'gold_earned': gold_earned_this_level,  # Chỉ số tiền kiếm được trong level này
+        'total_score': final_total_score,  # Tổng số tiền sau level này
         'reward': episode_reward,
         'steps': episode_steps,
         'level': level
@@ -207,6 +434,7 @@ def run_shopping_phase(
     level: int,
     money: int,
     seed: int = None,
+    show_window: bool = False,
 ) -> Dict:
     """
     Chạy shopping phase cho một level
@@ -217,15 +445,12 @@ def run_shopping_phase(
         level: Level hiện tại (1-9)
         money: Số tiền sau mining phase
         seed: Random seed for reproducibility
+        show_window: Có hiển thị cửa hàng không
         
     Returns:
         Dict với 'action', 'items_bought', 'cost', 'reward', 'money_after'
     """
     # Set seed for this phase if provided
-    if seed is not None:
-        np.random.seed(seed)
-        torch.manual_seed(seed)
-        random.seed(seed)
     
     # If using random agent, just get random action and return
     if env is None:
@@ -244,6 +469,10 @@ def run_shopping_phase(
         items_bought = decode_action(action)
         cost = calculate_cost(items_bought, shop_state.prices)
         money_after = money - cost
+        
+        # Render shop scene nếu show_window
+        if show_window:
+            render_shop_scene(shop_state, money, items_bought, cost, show_window=True)
         
         return {
             'action': action,
@@ -272,6 +501,10 @@ def run_shopping_phase(
     cost = calculate_cost(items_bought, shop_state.prices)
     money_after = money - cost
     
+    # Render shop scene nếu show_window
+    if show_window:
+        render_shop_scene(shop_state, money, items_bought, cost, show_window=True)
+    
     # Reward = 0 vì không chạy mining ở đây (mining sẽ chạy trong run_mining_phase của level tiếp theo)
     reward = 0
     
@@ -294,6 +527,7 @@ def run_full_simulation(
     num_levels: int = 10,
     show_details: bool = False,
     base_seed: int = None,
+    show_window: bool = False,
 ) -> Dict:
     """
     Chạy simulation đầy đủ qua num_levels levels
@@ -305,6 +539,7 @@ def run_full_simulation(
         num_levels: Number of levels to play
         show_details: Show detailed output
         base_seed: Base seed for reproducibility (each level gets base_seed + level)
+        show_window: Show game window during simulation
     
     Returns:
         Dict với full results
@@ -316,6 +551,7 @@ def run_full_simulation(
     }
     
     current_money = 0  # Bắt đầu với 0 tiền
+    current_dynamite = 0  # Bắt đầu với 0 dynamite
     
     for level in range(1, num_levels + 1):
         # Generate seed for this level
@@ -325,6 +561,7 @@ def run_full_simulation(
             print(f"LEVEL {level}/{num_levels}")
             print(f"{'='*60}")
             print(f"Money before level: ${current_money}")
+            print(f"Dynamite: {current_dynamite}")
         
         # ========== MINING PHASE ==========
         if show_details:
@@ -332,16 +569,23 @@ def run_full_simulation(
             if level_seed is not None:
                 print(f"  Seed: {level_seed}")
         
-        mining_result = run_mining_phase(mining_trainer, level, seed=level_seed)
+        mining_result = run_mining_phase(
+            mining_trainer, level, 
+            seed=level_seed, 
+            current_total_money=current_money,
+            current_dynamite=current_dynamite
+        )
         
         if show_details:
-            print(f"  Gold earned: ${mining_result['gold_earned']}")
+            print(f"  Gold earned this level: ${mining_result['gold_earned']}")
+            print(f"  Total score: ${mining_result['total_score']}")
             print(f"  Reward: {mining_result['reward']:.1f}")
             print(f"  Steps: {mining_result['steps']}")
         
-        # Update money và stats (use gold_earned for actual money)
+        # Update money và stats (use gold_earned for actual money earned this level)
         gold_from_level = mining_result['gold_earned']
-        current_money += gold_from_level
+        current_money = mining_result['total_score']  # Sử dụng total_score từ get_score()
+        current_dynamite = get_dynamite_count()  # Lấy số dynamite còn lại sau level
         results['total_gold'] += gold_from_level
         
         # ========== SHOPPING PHASE ==========
@@ -355,7 +599,8 @@ def run_full_simulation(
                 shopping_agent, 
                 level, 
                 current_money,
-                seed=49
+                seed=49,
+                show_window=show_window
             )
             
             if show_details:
@@ -373,9 +618,19 @@ def run_full_simulation(
                 print(f"  Money: ${shopping_result['money_before']} → ${shopping_result['money_after']}")
                 print(f"  {'='*50}\n")
             
-            # Update money
+            # Update money - trừ tiền đã chi
             current_money = shopping_result['money_after']
             results['total_money_spent'] += shopping_result['cost']
+            
+            # Cập nhật dynamite nếu mua
+            if shopping_result['items_bought'].get('dynamite', False):
+                current_dynamite = min(current_dynamite + 1, 5)  # Tối đa 5 dynamite
+                if show_details:
+                    print(f"  Dynamite after shopping: {current_dynamite}")
+            
+            # Cập nhật global score và dynamite để hiển thị đúng trên màn hình
+            set_score(current_money)
+            set_dynamite_count(current_dynamite)
             
             # Save level results
             level_result = {
@@ -490,11 +745,11 @@ def main():
                         help='Show detailed output for each level')
     parser.add_argument('--save-results', type=str, default=None,
                         help='Path to save results JSON file')
-    parser.add_argument('--seed', type=int, default=49,
+    parser.add_argument('--seed', type=int, default=None,
                         help='Random seed for reproducibility')
-    parser.add_argument('--fps', type=int, default=60,
-                        help='FPS limit (default: 60)')
-    parser.add_argument('--show', type = bool, default=True,
+    parser.add_argument('--fps', type=int, default=180,
+                        help='FPS limit (default: 180)')
+    parser.add_argument('--show', action='store_true',
                         help='Show game window during simulation')
     
     args = parser.parse_args()
@@ -581,7 +836,8 @@ def main():
             shopping_env=shopping_env,
             num_levels=args.num_levels,
             show_details=(args.show_details or args.show),  # Always show details when --show
-            base_seed=(args.seed + (run_idx - 1) * 1000) if args.seed is not None else None
+            base_seed=(args.seed + (run_idx - 1) * 1000) if args.seed is not None else None,
+            show_window=args.show  # Hiển thị cửa hàng khi --show
         )
         
         all_results.append(result)

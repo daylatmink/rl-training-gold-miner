@@ -165,6 +165,28 @@ def reset_game_state():
     scaled_time_offset = 0  # Reset thời gian đã scale
     use_fixed_timestep = False  # Reset về real time cho game bình thường
 
+def reset_level_state(keep_score=True, keep_dynamite=True):
+    """Reset state cho level mới, giữ nguyên score và dynamite nếu cần
+    
+    Args:
+        keep_score: Giữ nguyên score hiện tại (default: True)
+        keep_dynamite: Giữ nguyên số dynamite (default: True)
+    """
+    global score, goal, pause, start_time, dynamite_count, game_speed, scaled_time_offset, use_fixed_timestep
+    
+    # Lưu lại giá trị cần giữ
+    old_score = score if keep_score else 0
+    old_dynamite = dynamite_count if keep_dynamite else 0
+    
+    # Reset các giá trị khác
+    pause = False
+    start_time = None
+    scaled_time_offset = 0
+    
+    # Restore giá trị đã lưu
+    score = old_score
+    dynamite_count = old_dynamite
+
 def load_level_data():
     try:
         # Thử load từ assets/levels/ trước

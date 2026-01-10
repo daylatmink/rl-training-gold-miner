@@ -19,7 +19,7 @@ class DataDrivenLevelGenerator:
     # Statistical entity distribution from levels.json analysis (reduced counts)
     LEVEL_TEMPLATES = {
         'L1': {  # L1 group statistics
-            'total_items': (14, 16),
+            'total_items': (16, 19),
             'entities': {
                 'MiniGold': 3.0,
                 'NormalGold': 2.0,
@@ -106,7 +106,7 @@ class DataDrivenLevelGenerator:
             }
         },
         'L8': {
-            'total_items': (18, 27),
+            'total_items': (18, 22),
             'variant': 'random',  # Two variants
             'variant_a': {  # Diamond + TNT heavy (clustered in middle)
                 'entities': {
@@ -129,7 +129,7 @@ class DataDrivenLevelGenerator:
             }
         },
         'L9': {
-            'total_items': (12, 26),
+            'total_items': (12, 22),
             'variant': 'random',  # Three variants
             'variant_a': {  # 2 BigGold split screen + MoleWithDiamond + TNT
                 'entities': {
