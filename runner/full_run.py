@@ -16,6 +16,7 @@ from typing import Dict, List, Tuple
 import json
 import pygame
 import time
+from agent.QCNN.QCNN import QCNN
 
 from model.GoldMiner import GoldMinerEnv
 from model.ShoppingEnv import ShoppingEnv, generate_random_shop, get_valid_actions, decode_action, calculate_cost
@@ -24,8 +25,8 @@ from agent.ShoppingAgent import ShoppingAgent
 from trainer.QtentionTrainer import QtentionTrainer, angle_bins
 from define import (set_level, set_score, set_dynamite_count, get_dynamite_count, 
                     get_score, reset_game_state, get_level, set_goal, get_goal, goalAddOn)
+from trainer.DoubleQCNNTrainer import DoubleQCNNTrainer as QcnnTrainer
 import random
-
 
 def render_shop_scene(shop_state, money: int, items_bought: Dict, cost: int, show_window: bool = True):
     """
@@ -239,7 +240,7 @@ class RandomShoppingAgent:
         pass
 
 
-def load_mining_agent(checkpoint_path: str, device: str, env: GoldMinerEnv, use_random: bool = False):
+def load_mining_agent(net, checkpoint_path: str, device: str, env: GoldMinerEnv, use_random: bool = False):
     """Load trained mining agent with trainer wrapper or return random agent"""
     if use_random:
         print("Using random mining agent")
@@ -247,33 +248,48 @@ def load_mining_agent(checkpoint_path: str, device: str, env: GoldMinerEnv, use_
     
     print(f"Loading mining agent from: {checkpoint_path}")
     
-    agent = Qtention(
-        d_model=32,
-        n_actions=50,
-        nhead=8,
-        n_layers=6,
-        d_ff=48,
-        dropout=0.1,
-        max_items=30
-    ).to(device)
+    if net == 'attention':
+        agent = Qtention(
+            d_model=32,
+            n_actions=50,
+            nhead=8,
+            n_layers=6,
+            d_ff=48,
+            dropout=0.1,
+            max_items=30
+        ).to(device)
     
-    # Create trainer (for evaluate logic)
-    trainer = QtentionTrainer(
-        env=env,
-        agent=agent,
-        lr=1e-4,
-        gamma=1.0,
-        epsilon_start=0.0,  # No exploration for eval
-        epsilon_end=0.0,
-        epsilon_decay=1.0,
-        buffer_size=1,
-        batch_size=1,
-        target_update_freq=1,
-        train_freq=1,
-        num_planning=1,
-        use_planning=False
-    )
-    
+        # Create trainer (for evaluate logic)
+        trainer = QtentionTrainer(
+            env=env,
+            agent=agent,
+            lr=1e-4,
+            gamma=1.0,
+            epsilon_start=0.0,  # No exploration for eval
+            epsilon_end=0.0,
+            epsilon_decay=1.0,
+            buffer_size=1,
+            batch_size=1,
+            target_update_freq=1,
+            train_freq=1,
+            num_planning=1,
+            use_planning=False
+        )
+    elif net == 'cnn':
+        agent = QCNN().to(device)
+        
+        trainer = QcnnTrainer(
+            env=env,
+            agent=agent,
+            lr=1e-4,
+            gamma=1.0,
+            epsilon_start=0.0,
+            epsilon_end=0.0,
+            epsilon_decay=1.0,
+            buffer_size=1,
+            batch_size=1,
+            target_update_freq=1
+        )
     # Load checkpoint
     trainer.load_checkpoint(checkpoint_path)
     trainer.agent.eval()
@@ -296,7 +312,6 @@ def load_shopping_agent(checkpoint_path: str, use_random: bool = False):
     
     print(f"✓ Shopping agent loaded")
     return agent
-
 
 def run_mining_phase(
     trainer,  # QtentionTrainer or RandomMiningWrapper
@@ -492,7 +507,7 @@ def run_shopping_phase(
     # Get shop state từ env.shop_state (không có trong info)
     shop_state = env.shop_state
     
-    # Get action từ agent với constraints
+    # Get action từ agent với constraintưp
     action = agent.get_action(obs, shop_state=shop_state, money=money)
     
     # KHÔNG gọi env.step() vì nó sẽ chạy lại mining episode
@@ -521,7 +536,7 @@ def run_shopping_phase(
 
 
 def run_full_simulation(
-    mining_trainer: QtentionTrainer,
+    mining_trainer,
     shopping_agent: ShoppingAgent,
     shopping_env: ShoppingEnv,
     num_levels: int = 10,
@@ -548,6 +563,7 @@ def run_full_simulation(
         'levels': [],
         'total_gold': 0,  # Track total gold earned
         'total_money_spent': 0,
+        'final_money': 0
     }
     
     current_money = 0  # Bắt đầu với 0 tiền
@@ -599,7 +615,6 @@ def run_full_simulation(
                 shopping_agent, 
                 level, 
                 current_money,
-                seed=49,
                 show_window=show_window
             )
             
@@ -614,7 +629,6 @@ def run_full_simulation(
                     print(f"  ✗ Skipped shopping (no items bought)")
                 print(f"  Action ID: {shopping_result['action']}")
                 print(f"  Cost: ${shopping_result['cost']}")
-                print(f"  Expected reward: {shopping_result['reward']:.1f}")
                 print(f"  Money: ${shopping_result['money_before']} → ${shopping_result['money_after']}")
                 print(f"  {'='*50}\n")
             
@@ -831,7 +845,6 @@ def main():
         print(f"{'#'*80}")
         
         result = run_full_simulation(
-            mining_trainer=mining_trainer,
             shopping_agent=shopping_agent,
             shopping_env=shopping_env,
             num_levels=args.num_levels,
