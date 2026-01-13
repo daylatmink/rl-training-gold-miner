@@ -4685,6 +4685,132 @@
             }
         ]
     },
+    "L9_2": {
+        "type": "LevelA",
+        "entities": [
+            {
+                "type": "Diamond",
+                "pos": {
+                    "x": 483,
+                    "y": 549
+                }
+            },
+            {
+                "type": "Diamond",
+                "pos": {
+                    "x": 841,
+                    "y": 252
+                }
+            },
+            {
+                "type": "Diamond",
+                "pos": {
+                    "x": 1074,
+                    "y": 418
+                }
+            },
+            {
+                "type": "Diamond",
+                "pos": {
+                    "x": 671,
+                    "y": 270
+                }
+            },
+            {
+                "type": "Diamond",
+                "pos": {
+                    "x": 226,
+                    "y": 298
+                }
+            },
+            {
+                "type": "Diamond",
+                "pos": {
+                    "x": 737,
+                    "y": 633
+                }
+            },
+            {
+                "type": "Diamond",
+                "pos": {
+                    "x": 992,
+                    "y": 581
+                }
+            },
+            {
+                "type": "TNT",
+                "pos": {
+                    "x": 113,
+                    "y": 439
+                }
+            },
+            {
+                "type": "TNT",
+                "pos": {
+                    "x": 521,
+                    "y": 361
+                }
+            },
+            {
+                "type": "TNT",
+                "pos": {
+                    "x": 202,
+                    "y": 574
+                }
+            },
+            {
+                "type": "TNT",
+                "pos": {
+                    "x": 350,
+                    "y": 362
+                }
+            },
+            {
+                "type": "TNT",
+                "pos": {
+                    "x": 365,
+                    "y": 507
+                }
+            },
+            {
+                "type": "QuestionBag",
+                "pos": {
+                    "x": 1143,
+                    "y": 247
+                }
+            },
+            {
+                "type": "QuestionBag",
+                "pos": {
+                    "x": 986,
+                    "y": 288
+                }
+            },
+            {
+                "type": "QuestionBag",
+                "pos": {
+                    "x": 127,
+                    "y": 214
+                }
+            },
+            {
+                "type": "MoleWithDiamond",
+                "pos": {
+                    "x": 893,
+                    "y": 451
+                },
+                "dir": "Right"
+            },
+            {
+                "type": "MoleWithDiamond",
+                "pos": {
+                    "x": 1179,
+                    "y": 539
+                },
+                "dir": "Right"
+            }
+        ]
+    },
     "L9_3": {
         "type": "LevelA",
         "entities": [

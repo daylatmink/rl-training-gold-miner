@@ -257,15 +257,14 @@ def main():
     # Run simulations
     all_results = [[] for x in range(10)]  # Lưu kết quả cho mỗi level
     
-    for level in range(1, 11):
-        for run_idx in tqdm(range(1, args.num_runs_per_level + 1)):
+    for level in range(2, 11):
+        for run_idx in tqdm(range(args.num_runs_per_level)):
             
             result = run_mining_phase(
                 trainer=mining_trainer,
                 level=level,
                 current_dynamite=0  # Bắt đầu với 0 dynamite
             )
-            print(f"✓ Run {run_idx} completed for Level {level}: {result}")
             all_results[level-1].append(result)
     
     # Save results to file
