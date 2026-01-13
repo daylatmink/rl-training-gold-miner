@@ -265,7 +265,6 @@ def main():
                 level=level,
                 current_dynamite=0  # Bắt đầu với 0 dynamite
             )
-            print(f"✓ Run {run_idx} completed for Level {level}: {result}")
             all_results[level-1].append(result)
     
     # Save results to file

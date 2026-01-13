@@ -6,15 +6,96 @@ from entities.button import Button
 from entities.shopkeeper import Shopkeeper
 from scenes.scene import Scene
 from scenes.util import *
+import torch
+import numpy as np
+from agent.Qtention.Qtention import Qtention
+
+from agent.ShoppingAgent import ShoppingAgent
+from scenes.player_manager import PlayerManager
+from agent.Qtention.Embedder import Embedder
+from state_exporter import get_game_state, save_state_to_json
+
+
+angle_bins = [
+    (15.0, 18.0),    # Action 0
+    (18.0, 21.0),    # Action 1
+    (21.0, 24.0),    # Action 2
+    (24.0, 27.0),    # Action 3
+    (27.0, 30.0),    # Action 4
+    (30.0, 33.0),    # Action 5
+    (33.0, 36.0),    # Action 6
+    (36.0, 39.0),    # Action 7
+    (39.0, 42.0),    # Action 8
+    (42.0, 45.0),    # Action 9
+    (45.0, 48.0),    # Action 10
+    (48.0, 51.0),    # Action 11
+    (51.0, 54.0),    # Action 12
+    (54.0, 57.0),    # Action 13
+    (57.0, 60.0),    # Action 14
+    (60.0, 63.0),    # Action 15
+    (63.0, 66.0),    # Action 16
+    (66.0, 69.0),    # Action 17
+    (69.0, 72.0),    # Action 18
+    (72.0, 75.0),    # Action 19
+    (75.0, 78.0),    # Action 20
+    (78.0, 81.0),    # Action 21
+    (81.0, 84.0),    # Action 22
+    (84.0, 87.0),    # Action 23
+    (87.0, 90.0),    # Action 24
+    (90.0, 93.0),    # Action 25
+    (93.0, 96.0),    # Action 26
+    (96.0, 99.0),    # Action 27
+    (99.0, 102.0),   # Action 28
+    (102.0, 105.0),  # Action 29
+    (105.0, 108.0),  # Action 30
+    (108.0, 111.0),  # Action 31
+    (111.0, 114.0),  # Action 32
+    (114.0, 117.0),  # Action 33
+    (117.0, 120.0),  # Action 34
+    (120.0, 123.0),  # Action 35
+    (123.0, 126.0),  # Action 36
+    (126.0, 129.0),  # Action 37
+    (129.0, 132.0),  # Action 38
+    (132.0, 135.0),  # Action 39
+    (135.0, 138.0),  # Action 40
+    (138.0, 141.0),  # Action 41
+    (141.0, 144.0),  # Action 42
+    (144.0, 147.0),  # Action 43
+    (147.0, 150.0),  # Action 44
+    (150.0, 153.0),  # Action 45
+    (153.0, 156.0),  # Action 46
+    (156.0, 159.0),  # Action 47
+    (159.0, 162.0),  # Action 48
+    (162.0, 165.0)   # Action 49
+]
+
 clock = pygame.time.Clock()
 # THÊM IMPORT
 from scenes.util import level_manager, generate_random_level, get_training_level
 # THÊM IMPORT STATE EXPORTER
-from state_exporter import get_game_state, save_state_to_json
 # THÊM BIẾN TOÀN CỤC ĐỂ CONFIG
-USE_GENERATED_LEVELS = True   
+USE_GENERATED_LEVELS = False   
 class SceneMananger(object):
     def __init__(self):
+        # Load AI agents at game start
+        self.qtention_agent = Qtention(
+            d_model=32,
+            n_actions=50,
+            nhead=8,
+            n_layers=6,
+            d_ff=48,
+            dropout=0.1,
+            max_items=30
+        )
+        pot = torch.load('./checkpoints/qtention/checkpoint_cycle_2000.pth', map_location='cpu')
+        self.qtention_agent.load_state_dict(pot['agent_state_dict'])
+        self.qtention_agent.eval()
+
+        self.shopping_agent = ShoppingAgent(num_levels=9, num_actions=32)
+        self.shopping_agent.load('./checkpoints/shopping/attention.npz')
+        self.shopping_agent.set_eval_mode()
+
+        self.player_manager = PlayerManager(self.qtention_agent, Embedder, self.shopping_agent)
         self.go_to(StartScene())
     def go_to(self, scene):
         self.scene = scene
@@ -486,6 +567,7 @@ class GameScene(Scene):
             screen.blit(self.text_font.render("Cấp:", True, (0, 0, 0)), (1140, 25))
             screen.blit(self.text_font.render(str(self.level), True, (255, 100, 7)), (1190, 25))
     def next_level(self):
+        self.manager.player_manager.clear_mem()
         if get_score() > get_goal():
             set_level(get_level() + 1)
             
@@ -502,7 +584,7 @@ class GameScene(Scene):
     def handle_events(self, events):
         if self.timer < 0:
             self.next_level()
-            
+
         for e in events:
             if self.exit_button.is_click():
                 self.manager.go_to(StartScene())
@@ -513,44 +595,42 @@ class GameScene(Scene):
                 pygame.quit()
                 sys.exit(0)
             if e.type == pygame.KEYDOWN:
-                if e.key == pygame.K_SPACE: #EXPORT STATE và PAUSE/UNPAUSE
-                    # Lấy state và ghi vào file JSON (TRƯỚC KHI pause/unpause)
-                    state = get_game_state(self)
-                    save_state_to_json(state)
-                    print(f"✅ State đã được lưu vào state.json")
-                    
-                    # Sau đó mới pause/unpause
-                    if not self.pause:  # Nếu đang chơi → pause
-                        self.pause = True
-                        self.pause_time = pygame.time.get_ticks()/1000
-                        set_pause(True)
-                    else:  # Nếu đang pause → unpause
-                        self.pause = False
-                        set_pause(False)
-                        # Cộng thêm thời gian đã pause vào start_time
-                        set_time(get_time() + pygame.time.get_ticks()/1000 - self.pause_time)
+                if e.key == pygame.K_SPACE:
+                    # Switch player (AI/human) on space
+                    self.manager.player_manager.switch_player()
+                    print(f"🔄 Đã chuyển lượt: {self.manager.player_manager.current_player}")
                 if e.key == pygame.K_ESCAPE: #ESC --> test
                     self.next_level()
-                if e.key == pygame.K_DOWN and self.rope.timer <= 0: # expanding
-                    self.miner.state = 1
-                if e.key == pygame.K_UP: # retracting
-                    if hasattr(self.rope, 'have_TNT') and self.rope.have_TNT > 0 and self.rope.item is not None:
-                        self.rope.is_use_TNT = True
-                        self.miner.state = 4
-                        # SỬA: Khởi tạo explosive đúng cách
-                        self.explosive = Explosive(self.rope.x2-128, self.rope.y2-128, 12)
-                        self.play_Explosive = True
-                        self.rope.have_TNT -= 1
-                        
-                        # Cập nhật số dynamite trong global state
-                        from define import set_dynamite_count
-                        set_dynamite_count(self.rope.have_TNT)
-                        
-                        self.rope.length = 50
-                        self.miner.is_TNT = True
-                if e.key == pygame.K_RETURN:  # Enter key cycles game speed
-                    from define import cycle_game_speed
-                    cycle_game_speed()
+                    
+                # Chỉ cho phép tương tác khi là lượt người chơi
+                if self.manager.player_manager.is_human():
+                    if e.key == pygame.K_DOWN and self.rope.timer <= 0: # expanding
+                        self.miner.state = 1
+                    if e.key == pygame.K_UP: # retracting
+                        if hasattr(self.rope, 'have_TNT') and self.rope.have_TNT > 0 and self.rope.item is not None:
+                            self.rope.is_use_TNT = True
+                            self.miner.state = 4
+                            # SỬA: Khởi tạo explosive đúng cách
+                            self.explosive = Explosive(self.rope.x2-128, self.rope.y2-128, 12)
+                            self.play_Explosive = True
+                            self.rope.have_TNT -= 1
+                            # Cập nhật số dynamite trong global state
+                            from define import set_dynamite_count
+                            set_dynamite_count(self.rope.have_TNT)
+                            self.rope.length = 50
+                            self.miner.is_TNT = True
+        
+
+        if not self.manager.player_manager.is_human():
+            if self.rope.timer <= 0:
+                action = self.manager.player_manager.ask(self)
+                state = get_game_state(self)
+                current_angle = state['rope_state']['direction']
+                angle_decision = angle_bins[action]
+                if angle_decision[0] <= current_angle and current_angle < angle_decision[1]:
+                    self.miner.state = 1  # drop rope
+                    self.manager.player_manager.clear_mem()                    
+        
     def update(self, screen):
         from define import get_scaled_time_offset
         # Tính thời gian còn lại dựa trên scaled time thay vì real time
