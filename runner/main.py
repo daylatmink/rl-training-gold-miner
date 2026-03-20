@@ -12,6 +12,7 @@ def main():
     pygame.init()
     screen = pygame.display.set_mode((1280, 820))
     pygame.display.set_caption("Gold Miner")
+    clock = pygame.time.Clock()
     reset_game_state()
     
     manager = SceneMananger()
@@ -27,6 +28,7 @@ def main():
         manager.scene.render(screen)
         manager.scene.update(screen)
         pygame.display.update()
+        clock.tick(60)
 
 if __name__ == "__main__":
     main()
