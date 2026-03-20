@@ -188,7 +188,7 @@ def load_level(level, is_clover=False, is_gem=False, is_rock=False):
         try:
             from define import backgrounds
             bg = backgrounds[0] if backgrounds else None
-        except:
+        except (ImportError, AttributeError, IndexError):
             bg = None
         
         return bg, []  # Trả về list rỗng nếu lỗi
